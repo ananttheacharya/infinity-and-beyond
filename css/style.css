@@ -1,33 +1,33 @@
-/* Variables & Design Tokens: Notion (Clean) x Nothing (Brutalist, Tech, Dot-matrix, Red accents) */
+/* Variables & Design Tokens: Pink Aesthetic */
 :root, [data-theme="light"] {
-    --bg-main: #f9f9f9;
+    --bg-main: #fff5f8;
     --bg-surface: #ffffff;
-    --bg-sidebar: #f0f0f0;
+    --bg-sidebar: #ffeaf0;
     --text-main: #111111;
     --text-muted: #666666;
-    --accent-red: #ea3323;
-    --accent-red-light: rgba(234, 51, 35, 0.1);
-    --border-color: #e0e0e0;
-    --border-dark: #cccccc;
+    --accent-red: #ff7c9b;
+    --accent-red-light: rgba(255, 124, 155, 0.15);
+    --border-color: #ffb3c6;
+    --border-dark: #ff8fab;
     --glass-bg: rgba(255, 255, 255, 0.8);
     
     --font-sans: 'Inter', -apple-system, sans-serif;
-    --font-mono: 'DotGothic16', monospace; /* Nothing aesthetic */
+    --font-mono: 'DotGothic16', monospace;
     
     --transition: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 [data-theme="dark"] {
-    --bg-main: #121212;
-    --bg-surface: #1e1e1e;
-    --bg-sidebar: #181818;
-    --text-main: #ededed;
-    --text-muted: #a0a0a0;
-    --accent-red: #ea3323;
-    --accent-red-light: rgba(234, 51, 35, 0.15);
-    --border-color: #333333;
-    --border-dark: #444444;
-    --glass-bg: rgba(30, 30, 30, 0.8);
+    --bg-main: #1f0f15;
+    --bg-surface: #3d1b26;
+    --bg-sidebar: #2a121a;
+    --text-main: #fff5f8;
+    --text-muted: #ffb3c6;
+    --accent-red: #ff7c9b;
+    --accent-red-light: rgba(255, 124, 155, 0.15);
+    --border-color: #8c3551;
+    --border-dark: #a64263;
+    --glass-bg: rgba(61, 27, 38, 0.8);
 }
 
 /* Global Reset & Base */
