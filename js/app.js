@@ -228,13 +228,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         telemetryChart.update();
 
-        // Update Gauges
+        // Update Gauges (Safe Fallbacks)
         const setGauge = (element, value) => {
             if (!element) return;
-            const valNum = Math.round(value);
+            const safeValue = (value !== undefined && !isNaN(value)) ? value : 0;
+            const valNum = Math.round(safeValue);
             element.innerText = valNum + '%';
-            // Conic gradient for progress
-            const color = valNum > 75 ? '#4ade80' : (valNum > 40 ? '#f59e0b' : '#ef4444');
+            // Conic gradient for progress (Pink/Cyberpunk colors: Green/Yellow/Pink)
+            const color = valNum > 75 ? '#4ade80' : (valNum > 40 ? '#f59e0b' : 'var(--accent-pink)');
             element.style.background = `conic-gradient(${color} ${valNum}%, var(--bg-main) 0%)`;
         };
         
@@ -242,10 +243,27 @@ document.addEventListener('DOMContentLoaded', () => {
         setGauge(gaugeComb, data.comb_health);
         setGauge(gaugeTurb, data.turb_health);
         
-        // Update Stats
-        if (hudThrust) hudThrust.innerText = Math.round(data.thrust) + " N";
-        if (hudTsfc) hudTsfc.innerText = data.tsfc.toFixed(4);
-        if (hudPhysics) hudPhysics.innerText = data.physics_score;
+        // Update Stats (Safe Fallbacks)
+        if (hudThrust) {
+            const tVal = (data.thrust !== undefined && !isNaN(data.thrust)) ? data.thrust : 0;
+            hudThrust.innerText = Math.round(tVal) + " N";
+        }
+        if (hudTsfc) {
+            const tfVal = (data.tsfc !== undefined && !isNaN(data.tsfc)) ? data.tsfc : 0;
+            hudTsfc.innerText = tfVal.toFixed(4);
+        }
+        if (hudPhysics) {
+            hudPhysics.innerText = data.physics_score || "0%";
+            // Benchmark Guardrail Warning
+            const physVal = parseFloat(data.physics_score);
+            if (!isNaN(physVal) && physVal < 80) {
+                hudPhysics.style.color = '#ef4444'; // Red alert if physics consistency drops below 80%
+                hudPhysics.parentElement.classList.add('pulse');
+            } else {
+                hudPhysics.style.color = 'inherit';
+                hudPhysics.parentElement.classList.remove('pulse');
+            }
+        }
     });
     
     socket.on('telemetry_offline', () => {

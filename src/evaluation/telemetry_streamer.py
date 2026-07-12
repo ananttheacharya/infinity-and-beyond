@@ -84,8 +84,9 @@ def stream_telemetry():
             response = requests.post(url, json=payload)
             if response.status_code == 200:
                 print(f"Cycle {row['Cycle']} | Overall: {overall_h*100:.1f}% | Thrust: {thrust:.0f}N | Physics: {physics_score}")
-        except requests.exceptions.ConnectionError:
-            print("Error: Could not connect to Node.js server. Is it running on port 3000?")
+        except requests.exceptions.RequestException as e:
+            # Catch all network/timeout/protocol errors so the streamer doesn't crash on NaN or disconnects
+            print(f"Network Warning: Could not push telemetry to Dashboard. Waiting for reconnection... ({type(e).__name__})")
             time.sleep(2)
             continue
             

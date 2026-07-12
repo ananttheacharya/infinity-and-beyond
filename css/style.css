@@ -1,15 +1,16 @@
-/* Variables & Design Tokens: Professional Aerospace Theme (Slate/Blue) */
+/* Variables & Design Tokens: Professional Cyberpunk (Pink/Black) */
 :root, [data-theme="light"] {
-    --bg-main: #f0f4f8;
-    --bg-surface: #ffffff;
-    --bg-sidebar: #e1e8f0;
-    --text-main: #0f172a;
-    --text-muted: #64748b;
-    --accent-red: #0ea5e9; /* Kept variable name for compatibility, but color is Sky Blue */
-    --accent-red-light: rgba(14, 165, 233, 0.15);
-    --border-color: #cbd5e1;
-    --border-dark: #94a3b8;
-    --glass-bg: rgba(255, 255, 255, 0.8);
+    --bg-main: #0a0508;
+    --bg-surface: #140a10;
+    --bg-sidebar: #1a0d14;
+    --text-main: #f8e5ee;
+    --text-muted: #ffb3c6;
+    --accent-red: #ff3366; /* Hot Pink/Red */
+    --accent-pink: #ff7c9b;
+    --accent-red-light: rgba(255, 51, 102, 0.15);
+    --border-color: #4a1525;
+    --border-dark: #2d0d17;
+    --glass-bg: rgba(20, 10, 16, 0.85);
     
     --font-sans: 'Inter', -apple-system, sans-serif;
     --font-mono: 'DotGothic16', monospace;
@@ -18,16 +19,18 @@
 }
 
 [data-theme="dark"] {
-    --bg-main: #020617;
-    --bg-surface: #0f172a;
-    --bg-sidebar: #0b1120;
-    --text-main: #f8fafc;
-    --text-muted: #94a3b8;
-    --accent-red: #38bdf8; /* Light Sky Blue */
-    --accent-red-light: rgba(56, 189, 248, 0.15);
-    --border-color: #1e293b;
-    --border-dark: #334155;
-    --glass-bg: rgba(15, 23, 42, 0.8);
+    /* Identical for dark mode as the theme is inherently dark cyberpunk */
+    --bg-main: #050204;
+    --bg-surface: #0f070b;
+    --bg-sidebar: #140a10;
+    --text-main: #ffffff;
+    --text-muted: #ffb3c6;
+    --accent-red: #ff1a53; 
+    --accent-pink: #ff4d79;
+    --accent-red-light: rgba(255, 26, 83, 0.2);
+    --border-color: #5c1a2e;
+    --border-dark: #3d111f;
+    --glass-bg: rgba(15, 7, 11, 0.9);
 }
 
 /* Global Reset & Base */

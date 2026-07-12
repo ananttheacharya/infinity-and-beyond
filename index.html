@@ -123,6 +123,65 @@
                         </div>
                     </div>
                 </div>
+
+                <header class="section-header mt-6">
+                    <h2>Model Benchmark Showdown</h2>
+                    <p class="text-accent glow-text">Accuracy vs. Thermodynamic Violations</p>
+                </header>
+                
+                <div class="card-grid mt-4">
+                    <div class="sci-fi-panel">
+                        <div class="card-header">
+                            <i data-lucide="bar-chart-2" class="text-accent"></i>
+                            <h3 class="glow-text">RMSE Accuracy Matrix</h3>
+                        </div>
+                        
+                        <div class="mt-6" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                            <!-- Icarus -->
+                            <div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                    <span style="font-family: var(--font-mono); font-size: 0.9rem;">Project Icarus (GRU)</span>
+                                    <span style="font-family: var(--font-mono); font-size: 0.9rem; color: #ef4444;">RMSE: 42.5</span>
+                                </div>
+                                <div style="width: 100%; background: rgba(255,255,255,0.05); height: 8px; border-radius: 4px; overflow: hidden;">
+                                    <div style="width: 85%; background: #ef4444; height: 100%; box-shadow: 0 0 10px #ef4444;"></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Titan -->
+                            <div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                    <span style="font-family: var(--font-mono); font-size: 0.9rem;">Project Titan (XGBoost)</span>
+                                    <span style="font-family: var(--font-mono); font-size: 0.9rem; color: #f59e0b;">RMSE: 38.2</span>
+                                </div>
+                                <div style="width: 100%; background: rgba(255,255,255,0.05); height: 8px; border-radius: 4px; overflow: hidden;">
+                                    <div style="width: 76%; background: #f59e0b; height: 100%; box-shadow: 0 0 10px #f59e0b;"></div>
+                                </div>
+                            </div>
+
+                            <!-- PINN -->
+                            <div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                    <span style="font-family: var(--font-mono); font-size: 0.9rem; color: #4ade80;">Our PINN Digital Twin</span>
+                                    <span style="font-family: var(--font-mono); font-size: 0.9rem; color: #4ade80;">RMSE: 12.4</span>
+                                </div>
+                                <div style="width: 100%; background: rgba(255,255,255,0.05); height: 8px; border-radius: 4px; overflow: hidden;">
+                                    <div style="width: 25%; background: #4ade80; height: 100%; box-shadow: 0 0 10px #4ade80;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sci-fi-panel">
+                        <div class="card-header">
+                            <i data-lucide="zap" class="text-accent"></i>
+                            <h3 class="glow-text">Thermodynamic Violations (%)</h3>
+                        </div>
+                        <div style="position: relative; height: 200px; width: 100%; margin-top: 1rem;">
+                            <canvas id="violationChart"></canvas>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- OVERVIEW SECTION -->
