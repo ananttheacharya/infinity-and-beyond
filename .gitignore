@@ -2,3 +2,9 @@ node_modules/
 dist/
 .env
 .DS_Store
+
+# Large datasets and models
+Dataset/
+*.h5
+*.pth
+*.zip

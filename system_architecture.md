@@ -25,8 +25,12 @@ graph TD
 ### A. The Thermodynamics Engine (`src/data_pipeline/thermodynamics.py`)
 Standard ML feeds raw Temperatures (T2, T3) and Pressures (P2, P3) directly into a neural network. We intercept this data.
 The `ThermodynamicsEngine` calculates physical invariants:
-1. **Compressor Pressure Ratio (PR_comp):** $P_2 / P_{amb}$
-2. **Isentropic Efficiency:** A measure of how much actual work is done compared to ideal work. It is calculated using the specific heat ratio of air ($\gamma = 1.4$) and the relationship between temperature and pressure ratios.
+
+1. **Compressor Pressure Ratio ($PR_{comp}$):** 
+   $$PR_{comp} = \frac{P_2}{P_{amb}}$$
+
+2. **Isentropic Efficiency ($\eta_c$):** A measure of how much actual work is done compared to ideal work. It is calculated using the specific heat ratio of air ($\gamma = 1.4$) and the relationship between temperature and pressure ratios.
+   $$\eta_c = \frac{ \left(\frac{P_2}{P_{amb}}\right)^{\frac{\gamma-1}{\gamma}} - 1 }{ \left(\frac{T_2}{T_{amb}}\right) - 1 }$$
 
 By feeding these calculated features to the AI, we drastically reduce the complexity the AI needs to learn. It no longer has to discover the laws of physics on its own.
 
@@ -40,9 +44,17 @@ Built in PyTorch, this is a multi-head architecture:
 
 ### C. The Physics-Informed Loss Function (`src/models/loss.py`)
 This is the most critical innovation. During backpropagation, the model is penalized based on three criteria:
-$$ Total\_Loss = \alpha \cdot MSE_{RUL} + \beta \cdot CrossEntropy_{Risk} + \gamma \cdot Penalty_{Physics} $$
 
-The **Physics Penalty** mathematically forbids the network from predicting future states that violate thermodynamics. For example, if the model's weights start adjusting in a way that implies an Isentropic Efficiency $> 100\%$, the loss explodes, forcing the model back into the realm of physical reality.
+$$ \mathcal{L}_{Total} = \alpha \cdot \mathcal{L}_{MSE}(\hat{RUL}, RUL) + \beta \cdot \mathcal{L}_{CE}(\hat{Risk}, Risk) + \gamma \cdot \mathcal{L}_{Physics} $$
+
+Where the Physics Penalty ($\mathcal{L}_{Physics}$) is defined as:
+$$ \mathcal{L}_{Physics} = \sum_{i} \text{ReLU}(\eta_c^{(i)} - 1.0)^2 + \sum_{i} \text{ReLU}(0.5 - \eta_c^{(i)})^2 $$
+
+**The Calculus of Constraints:**
+During gradient descent, the partial derivatives enforce the boundary conditions. If the model's weights imply $\eta_c > 1.0$ (an impossible efficiency), the gradient of the loss with respect to the weights $\theta$ becomes:
+$$ \frac{\partial \mathcal{L}_{Total}}{\partial \theta} = \alpha \frac{\partial \mathcal{L}_{MSE}}{\partial \theta} + \gamma \cdot 2(\eta_c - 1.0) \frac{\partial \eta_c}{\partial \theta} $$
+
+This massive gradient penalty forces the optimizer to step away from the unphysical region, trapping the neural network entirely within the realm of physical reality.
 
 ## 3. Deployment Architecture (Next Steps)
 Once the model is trained in the Jupyter Notebook, it will be exported (e.g., via ONNX) and wrapped in a FastAPI microservice. A separate Python Telemetry Simulator will stream real-time flight cycle data via WebSockets to a Node.js/Vue.js dashboard, creating a true, live Digital Twin.

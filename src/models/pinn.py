@@ -6,11 +6,15 @@ class PINNDigitalTwin(nn.Module):
     """
     Physics-Informed Neural Network (PINN) for Digital Twin.
     Incorporates MC Dropout for Uncertainty Quantification.
-    Hybrid output: 
-        1. RUL (Remaining Useful Life) Regressor
-        2. Health Status (Healthy, Degrading, Critical) Classifier
+    Multi-head output for Competition Deliverables: 
+        1. Compressor Health (0-1)
+        2. Combustor Health (0-1)
+        3. Turbine Health (0-1)
+        4. Overall Health (0-1)
+        5. Engine Thrust (N)
+        6. TSFC (g/N.s)
     """
-    def __init__(self, input_dim, hidden_dim=64, dropout_rate=0.3):
+    def __init__(self, input_dim, hidden_dim=128, dropout_rate=0.3):
         super(PINNDigitalTwin, self).__init__()
         
         # Shared Feature Extractor (Backbone)
@@ -21,13 +25,13 @@ class PINNDigitalTwin(nn.Module):
         # MC Dropout Layer - we keep this active even during inference for uncertainty estimation
         self.mc_dropout = nn.Dropout(p=dropout_rate)
         
-        # Head 1: RUL Regressor
-        self.rul_head_fc1 = nn.Linear(hidden_dim, hidden_dim // 2)
-        self.rul_head_out = nn.Linear(hidden_dim // 2, 1)
-        
-        # Head 2: Health Risk Classifier (3 classes)
-        self.risk_head_fc1 = nn.Linear(hidden_dim, hidden_dim // 2)
-        self.risk_head_out = nn.Linear(hidden_dim // 2, 3)
+        # Output Heads (All share the backbone)
+        self.compressor_head = nn.Linear(hidden_dim, 1)
+        self.combustor_head = nn.Linear(hidden_dim, 1)
+        self.turbine_head = nn.Linear(hidden_dim, 1)
+        self.overall_health_head = nn.Linear(hidden_dim, 1)
+        self.thrust_head = nn.Linear(hidden_dim, 1)
+        self.tsfc_head = nn.Linear(hidden_dim, 1)
 
     def forward(self, x):
         # Shared layers
@@ -38,36 +42,45 @@ class PINNDigitalTwin(nn.Module):
         x = F.relu(self.shared_fc3(x))
         x = self.mc_dropout(x)
         
-        # RUL Head
-        rul_features = F.relu(self.rul_head_fc1(x))
-        rul_features = self.mc_dropout(rul_features)
-        rul_pred = F.softplus(self.rul_head_out(rul_features)) # Softplus ensures positive RUL
+        # Subsystem & Overall Health (Sigmoid bounds between 0 and 1)
+        comp_h = torch.sigmoid(self.compressor_head(x))
+        comb_h = torch.sigmoid(self.combustor_head(x))
+        turb_h = torch.sigmoid(self.turbine_head(x))
+        overall_h = torch.sigmoid(self.overall_health_head(x))
         
-        # Risk Head
-        risk_features = F.relu(self.risk_head_fc1(x))
-        risk_features = self.mc_dropout(risk_features)
-        risk_pred = self.risk_head_out(risk_features) # CrossEntropyLoss will handle softmax
+        # Performance Metrics (Softplus ensures positive values)
+        thrust = F.softplus(self.thrust_head(x))
+        tsfc = F.softplus(self.tsfc_head(x))
         
-        return rul_pred, risk_pred
+        return comp_h, comb_h, turb_h, overall_h, thrust, tsfc
         
-    def predict_with_uncertainty(self, x, num_samples=50):
+    def predict_with_uncertainty(self, x, num_samples=30):
         """
         Runs multiple forward passes with Dropout enabled to calculate 
         predictive mean and variance (MC Dropout).
+        Returns means and stds for all 6 outputs.
         """
-        # Ensure dropout is active
-        self.train() 
+        self.train() # Ensure dropout is active
         
-        rul_preds = []
-        for _ in range(num_samples):
-            rul_pred, _ = self.forward(x)
-            rul_preds.append(rul_pred)
+        preds_comp, preds_comb, preds_turb = [], [], []
+        preds_overall, preds_thrust, preds_tsfc = [], [], []
+        
+        with torch.no_grad():
+            for _ in range(num_samples):
+                comp, comb, turb, overall, thrust, tsfc = self.forward(x)
+                preds_comp.append(comp)
+                preds_comb.append(comb)
+                preds_turb.append(turb)
+                preds_overall.append(overall)
+                preds_thrust.append(thrust)
+                preds_tsfc.append(tsfc)
             
-        rul_preds = torch.stack(rul_preds)
-        
-        # Calculate mean and standard deviation (uncertainty)
-        rul_mean = rul_preds.mean(dim=0)
-        rul_std = rul_preds.std(dim=0)
-        
-        # Reset to eval mode ideally, but leaving as is for simplicity
-        return rul_mean, rul_std
+        # Helper to calculate mean and std
+        def get_stats(tensor_list):
+            stacked = torch.stack(tensor_list)
+            return stacked.mean(dim=0), stacked.std(dim=0)
+            
+        return (
+            get_stats(preds_comp), get_stats(preds_comb), get_stats(preds_turb),
+            get_stats(preds_overall), get_stats(preds_thrust), get_stats(preds_tsfc)
+        )

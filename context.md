@@ -18,10 +18,12 @@ The team is participating in the IIT Indore × HAL competition to build a Physic
 4. **Explainability & Telemetry Layer:** Predictions are mapped to a causal logic tree (e.g., `P2/Pamb drops` -> `T2/Tamb rises` -> `Compressor Fouling`) to provide readable explanations for HAL engineers. A Python telemetry simulator will stream live data to the Node.js dashboard.
 
 ## Current Progress
-- Formulated the comprehensive 3-day action plan (`plan.md` and `implementation_plan.md`).
-- Identified the thermodynamic equations required for feature engineering.
+- Formulated the comprehensive action plan.
+- **Dual-Dataset Testing Methodology Defined:** 
+  - **Phase 1 (CSV Showdown):** Train competitor models (Project Icarus/GRU, Titan/XGBoost) and our PINN on `train.csv`. Evaluate and compare against `ground_truth.csv`.
+  - **Phase 2 (NASA Deep-Tech):** Map the massive `N-CMAPSS_DS03-012.h5` datasets `X_s_dev` (for training) and test against `Y_test`.
 - Established the hybrid Deep Learning architecture requirements (PyTorch, MC Dropout).
-- **Currently:** Setting up the project folder structure (src modules for physics, data, and models), installing dependencies from `requirements.txt`, and writing foundational explainers for the team.
+- Set up the **Mission Control Dashboard** using Node.js and Socket.io to stream real-time physics telemetry.
 
 ## Next Steps
 - Implement `thermodynamics.py` to calculate explicit physics features.

@@ -12,6 +12,7 @@
     
     <!-- Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- Styles -->
     <link rel="stylesheet" href="css/style.css">
@@ -42,6 +43,9 @@
                 <button class="nav-item" data-target="library">
                     <i data-lucide="library"></i> Library
                 </button>
+                <button class="nav-item text-accent" data-target="mission-control" style="margin-top: 1rem; border: 1px solid var(--accent-red);">
+                    <i data-lucide="radio-tower"></i> Mission Control
+                </button>
             </nav>
             
             <div class="sidebar-footer">
@@ -57,6 +61,70 @@
         <!-- Main Content Area -->
         <main class="content-area">
             
+            <!-- MISSION CONTROL SECTION -->
+            <section id="mission-control" class="tab-pane">
+                
+                <!-- OFFLINE OVERLAY -->
+                <div id="offline-overlay" class="offline-overlay">
+                    <div class="offline-content">
+                        <i data-lucide="power-off" class="offline-icon pulse-slow"></i>
+                        <h2>SYSTEM OFFLINE</h2>
+                        <p>Awaiting Neural Telemetry Link...</p>
+                        <p class="offline-subtext">Run <code>python src/evaluation/telemetry_streamer.py</code> locally to commence real-time digital twin inference.</p>
+                    </div>
+                </div>
+
+                <header class="section-header">
+                    <h2>Advanced Engine Diagnostics HUD</h2>
+                    <p class="text-accent glow-text" id="live-indicator">LIVE TELEMETRY FEED ACTIVE</p>
+                </header>
+                
+                <!-- SUBSYSTEM HEALTH ROW -->
+                <div class="subsystem-grid mt-4">
+                    <div class="sci-fi-panel center-content">
+                        <h4>Compressor Health</h4>
+                        <div class="circular-gauge" id="gauge-comp">--%</div>
+                    </div>
+                    <div class="sci-fi-panel center-content">
+                        <h4>Combustor Health</h4>
+                        <div class="circular-gauge" id="gauge-comb">--%</div>
+                    </div>
+                    <div class="sci-fi-panel center-content">
+                        <h4>Turbine Health</h4>
+                        <div class="circular-gauge" id="gauge-turb">--%</div>
+                    </div>
+                </div>
+
+                <div class="hud-grid mt-4">
+                    <!-- Left: Main Telemetry Chart -->
+                    <div class="sci-fi-panel">
+                        <div class="card-header">
+                            <i data-lucide="activity" class="text-accent"></i>
+                            <h3 class="glow-text">Overall Health & Performance Degradation</h3>
+                        </div>
+                        <div style="position: relative; height: 250px; width: 100%;">
+                            <canvas id="telemetryChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Right: Performance Metrics -->
+                    <div class="sci-fi-panel" style="display: flex; flex-direction: column; justify-content: space-around;">
+                        <div class="hud-stat">
+                            <div class="hud-stat-value text-accent" id="hud-thrust">-- N</div>
+                            <div class="hud-stat-label">Estimated Thrust Output</div>
+                        </div>
+                        <div class="hud-stat">
+                            <div class="hud-stat-value" id="hud-tsfc" style="color: #4ade80;">-- g/(N·s)</div>
+                            <div class="hud-stat-label">Fuel Efficiency (TSFC)</div>
+                        </div>
+                        <div class="hud-stat">
+                            <div class="hud-stat-value" id="hud-physics">--%</div>
+                            <div class="hud-stat-label">Physics Consistency (Isentropic)</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- OVERVIEW SECTION -->
             <section id="overview" class="tab-pane active">
                 <header class="section-header">

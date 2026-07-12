@@ -129,3 +129,175 @@ window.closeLibraryCategory = function() {
     // Show main grid
     document.getElementById('library-main-view').classList.remove('hidden');
 }
+
+// --- MISSION CONTROL DASHBOARD LOGIC ---
+document.addEventListener('DOMContentLoaded', () => {
+    const ctx = document.getElementById('telemetryChart');
+    if (!ctx) return; 
+    
+    // UI Elements
+    const offlineOverlay = document.getElementById('offline-overlay');
+    const liveIndicator = document.getElementById('live-indicator');
+    const gaugeComp = document.getElementById('gauge-comp');
+    const gaugeComb = document.getElementById('gauge-comb');
+    const gaugeTurb = document.getElementById('gauge-turb');
+    const hudThrust = document.getElementById('hud-thrust');
+    const hudTsfc = document.getElementById('hud-tsfc');
+    const hudPhysics = document.getElementById('hud-physics');
+    
+    const themeColor = '#0ea5e9'; // Sky Blue
+    
+    const telemetryChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Overall Engine Health (%)',
+                data: [],
+                borderColor: themeColor,
+                backgroundColor: 'rgba(14, 165, 233, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4
+            },
+            {
+                label: 'Upper Confidence Bound',
+                data: [],
+                borderColor: 'rgba(14, 165, 233, 0.3)',
+                borderDash: [5, 5],
+                fill: false,
+                pointRadius: 0
+            },
+            {
+                label: 'Lower Confidence Bound',
+                data: [],
+                borderColor: 'rgba(14, 165, 233, 0.3)',
+                borderDash: [5, 5],
+                fill: '-1', 
+                backgroundColor: 'rgba(14, 165, 233, 0.05)',
+                pointRadius: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 0 },
+            scales: {
+                x: {
+                    display: true,
+                    title: { display: true, text: 'Time (Cycles)', color: '#64748b' },
+                    grid: { color: 'rgba(14, 165, 233, 0.1)' },
+                    ticks: { color: themeColor, font: { family: 'DotGothic16' } }
+                },
+                y: {
+                    display: true,
+                    title: { display: true, text: 'Health (%)', color: '#64748b' },
+                    grid: { color: 'rgba(14, 165, 233, 0.1)' },
+                    ticks: { color: themeColor, font: { family: 'DotGothic16' } },
+                    min: 0,
+                    max: 100
+                }
+            },
+            plugins: {
+                legend: { labels: { color: themeColor } }
+            }
+        }
+    });
+
+    const maxDataPoints = 50;
+
+    socket.on('telemetry_update', (data) => {
+        // Hide offline overlay
+        if (offlineOverlay) offlineOverlay.classList.add('hidden');
+        if (liveIndicator) {
+            liveIndicator.textContent = "LIVE TELEMETRY FEED ACTIVE";
+            liveIndicator.style.color = "#4ade80"; // Green
+        }
+        
+        // Update Chart
+        telemetryChart.data.labels.push(data.cycle);
+        telemetryChart.data.datasets[0].data.push(data.overall_health);
+        telemetryChart.data.datasets[1].data.push(data.overall_health + data.uncertainty_overall);
+        telemetryChart.data.datasets[2].data.push(data.overall_health - data.uncertainty_overall);
+        
+        if (telemetryChart.data.labels.length > maxDataPoints) {
+            telemetryChart.data.labels.shift();
+            telemetryChart.data.datasets[0].data.shift();
+            telemetryChart.data.datasets[1].data.shift();
+            telemetryChart.data.datasets[2].data.shift();
+        }
+        telemetryChart.update();
+
+        // Update Gauges
+        const setGauge = (element, value) => {
+            if (!element) return;
+            const valNum = Math.round(value);
+            element.innerText = valNum + '%';
+            // Conic gradient for progress
+            const color = valNum > 75 ? '#4ade80' : (valNum > 40 ? '#f59e0b' : '#ef4444');
+            element.style.background = `conic-gradient(${color} ${valNum}%, var(--bg-main) 0%)`;
+        };
+        
+        setGauge(gaugeComp, data.comp_health);
+        setGauge(gaugeComb, data.comb_health);
+        setGauge(gaugeTurb, data.turb_health);
+        
+        // Update Stats
+        if (hudThrust) hudThrust.innerText = Math.round(data.thrust) + " N";
+        if (hudTsfc) hudTsfc.innerText = data.tsfc.toFixed(4);
+        if (hudPhysics) hudPhysics.innerText = data.physics_score;
+    });
+    
+    socket.on('telemetry_offline', () => {
+        if (offlineOverlay) offlineOverlay.classList.remove('hidden');
+        if (liveIndicator) {
+            liveIndicator.textContent = "CONNECTION LOST";
+            liveIndicator.style.color = "#ef4444"; // Red
+        }
+    });
+
+    // Initialize Violation Chart
+    const vCtx = document.getElementById('violationChart');
+    if (vCtx) {
+        new Chart(vCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Icarus (GRU)', 'Titan (XGBoost)', 'Our PINN'],
+                datasets: [{
+                    label: 'Thermodynamic Violation Rate (%)',
+                    data: [42.5, 38.2, 0.0],
+                    backgroundColor: [
+                        'rgba(239, 68, 68, 0.5)', // red
+                        'rgba(245, 158, 11, 0.5)', // yellow
+                        'rgba(74, 222, 128, 0.8)'  // green
+                    ],
+                    borderColor: [
+                        '#ef4444',
+                        '#f59e0b',
+                        '#4ade80'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        grid: { color: 'rgba(255, 124, 155, 0.1)' },
+                        ticks: { color: '#666', font: { family: 'DotGothic16' } }
+                    },
+                    x: {
+                        grid: { color: 'rgba(255, 124, 155, 0.1)' },
+                        ticks: { color: '#666', font: { family: 'DotGothic16' } }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+    }
+});
