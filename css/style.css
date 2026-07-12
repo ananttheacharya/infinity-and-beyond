@@ -640,10 +640,10 @@ a.library-item:hover .action-icon {
 }
 
 /* Dot matrix aesthetic for the big card icons */
-.big-category-card .big-icon svg {
-    stroke-dasharray: 2 4;
-    stroke-width: 2.5;
-    stroke-linecap: round;
+svg.big-icon {
+    stroke-dasharray: 2 4 !important;
+    stroke-width: 2.5 !important;
+    stroke-linecap: round !important;
 }
 
 .big-category-card:hover .big-icon {
