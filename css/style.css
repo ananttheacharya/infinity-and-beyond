@@ -640,8 +640,11 @@ a.library-item:hover .action-icon {
 }
 
 /* Dot matrix aesthetic for the big card icons */
-svg.big-icon {
+svg.big-icon:not(.lucide-github) {
     stroke-dasharray: 2 4 !important;
+}
+
+svg.big-icon {
     stroke-width: 2.5 !important;
     stroke-linecap: round !important;
 }
