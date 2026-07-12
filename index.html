@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zero and Already Behind - Portal</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <i data-lucide="cpu" class="brand-icon text-accent"></i>
+                <h1 class="brand-title">Zero & Already Behind</h1>
+                <p class="brand-subtitle">Project Jumpstart Portal</p>
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-item active" data-target="overview">
+                    <i data-lucide="layout-dashboard"></i> Overview
+                </button>
+                <button class="nav-item" data-target="architecture">
+                    <i data-lucide="layers"></i> Architecture
+                </button>
+                <button class="nav-item" data-target="methodology">
+                    <i data-lucide="flask-conical"></i> Methodology
+                </button>
+                <button class="nav-item" data-target="workstreams">
+                    <i data-lucide="check-square"></i> Workstreams
+                </button>
+                <button class="nav-item" data-target="library">
+                    <i data-lucide="library"></i> Library
+                </button>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button id="theme-toggle" class="nav-item" style="margin-bottom: 1rem;">
+                    <i data-lucide="moon"></i> Toggle Theme
+                </button>
+                <div class="status-indicator">
+                    <span class="dot pulse"></span> Timeline: Day 1 of 3
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="content-area">
+            
+            <!-- OVERVIEW SECTION -->
+            <section id="overview" class="tab-pane active">
+                <header class="section-header">
+                    <h2>Mission Overview</h2>
+                    <p>Physics-Informed Digital Twin (PIDT) for Turbojet Health Monitoring</p>
+                </header>
+                
+                <div class="card-grid">
+                    <div class="glass-card accent-top">
+                        <div class="card-header">
+                            <i data-lucide="target" class="text-accent"></i>
+                            <h3>The Objective</h3>
+                        </div>
+                        <p>Build a competition-winning, physics-informed, interpretable digital twin for a four-stage single-spool turbojet engine. Avoid purely data-driven "black-box" models. Embed first-principles thermodynamics.</p>
+                    </div>
+                    
+                    <div class="glass-card">
+                        <div class="card-header">
+                            <i data-lucide="award"></i>
+                            <h3>Evaluation Criteria</h3>
+                        </div>
+                        <ul class="clean-list">
+                            <li><strong>30%</strong> Health Estimation Accuracy</li>
+                            <li><strong>25%</strong> Optimization Quality / Surrogate Perf.</li>
+                            <li><strong>20%</strong> Engineering Justification</li>
+                            <li><strong>15%</strong> Innovation & Physics Consistency</li>
+                            <li><strong>10%</strong> Dashboard & Interpretability</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="glass-card mt-6">
+                    <div class="card-header">
+                        <i data-lucide="rocket" class="text-accent"></i>
+                        <h3>Why Our Plan Wins</h3>
+                    </div>
+                    <p class="mb-4">Most teams will optimize purely for prediction accuracy (MSE) and fail the "Engineering Justification" and "Physics Consistency" criteria. We will win by:</p>
+                    <ol class="numbered-list">
+                        <li><strong>Offloading Physics:</strong> Ensuring inputs to the ML models are physically meaningful (thermodynamic invariants).</li>
+                        <li><strong>Causal Explanations:</strong> A rule-base ensuring the output is interpretable to HAL engineers.</li>
+                        <li><strong>Interactive UX:</strong> A Mission Replay Engine and Causal Failure Graph.</li>
+                    </ol>
+                </div>
+            </section>
+
+            <!-- ARCHITECTURE SECTION -->
+            <section id="architecture" class="tab-pane">
+                <header class="section-header">
+                    <h2>The Multi-Layer Digital Twin</h2>
+                    <p>Hierarchical data flow mimicking aerospace processing</p>
+                </header>
+                
+                <div class="architecture-diagram">
+                    <div class="arch-layer" onclick="toggleDetails('layer-1')">
+                        <span class="layer-number">01</span>
+                        <div class="layer-content">
+                            <h3>Sensor Stream & Data Validation</h3>
+                            <p>Ingests raw CSV data. Validates physical bounds.</p>
+                        </div>
+                        <i data-lucide="chevron-right"></i>
+                    </div>
+                    <div id="layer-1" class="layer-details hidden">
+                        <p><strong>Inputs:</strong> Altitude, Mach, Tamb, Pamb, RPM, Fuel Flow, P2, T2, P3, T3, P4, T4.</p>
+                    </div>
+
+                    <div class="arch-layer" onclick="toggleDetails('layer-2')">
+                        <span class="layer-number">02</span>
+                        <div class="layer-content">
+                            <h3>Physics Layer <span class="badge text-accent border-accent">CRITICAL</span></h3>
+                            <p>Calculates thermodynamic indicators and physically meaningful features.</p>
+                        </div>
+                        <i data-lucide="chevron-right"></i>
+                    </div>
+                    <div id="layer-2" class="layer-details hidden">
+                        <ul class="clean-list">
+                            <li>Compressor PR: P2/Pamb</li>
+                            <li>Turbine PR: P4/P3</li>
+                            <li>Normalized Shaft Speed: RPM/√(Tamb)</li>
+                        </ul>
+                    </div>
+
+                    <div class="arch-layer" onclick="toggleDetails('layer-3')">
+                        <span class="layer-number">03</span>
+                        <div class="layer-content">
+                            <h3>Subsystem Models</h3>
+                            <p>Lightweight surrogate models for Compressor, Combustor, Turbine.</p>
+                        </div>
+                        <i data-lucide="chevron-right"></i>
+                    </div>
+                    <div id="layer-3" class="layer-details hidden">
+                        <p>Maps physics features to individual subsystem health indices using PINNs or regularized trees.</p>
+                    </div>
+
+                    <div class="arch-layer" onclick="toggleDetails('layer-4')">
+                        <span class="layer-number">04</span>
+                        <div class="layer-content">
+                            <h3>Health Fusion & Prediction</h3>
+                            <p>Aggregates health indices and estimates thrust/degradation.</p>
+                        </div>
+                        <i data-lucide="chevron-right"></i>
+                    </div>
+                    <div id="layer-4" class="layer-details hidden">
+                        <p>Provides uncertainty quantification and Remaining Useful Life (RUL).</p>
+                    </div>
+
+                    <div class="arch-layer" onclick="toggleDetails('layer-5')">
+                        <span class="layer-number">05</span>
+                        <div class="layer-content">
+                            <h3>Explainability & Decision Layer</h3>
+                            <p>Rule-based causal chains and interactive mission control dashboard.</p>
+                        </div>
+                        <i data-lucide="chevron-right"></i>
+                    </div>
+                    <div id="layer-5" class="layer-details hidden">
+                        <p>Translates <em>"Health 84%"</em> into <em>"Pressure ratio dropped -> Compressor fouling -> 3% loss -> Inspect"</em>.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- METHODOLOGY SECTION -->
+            <section id="methodology" class="tab-pane">
+                <header class="section-header">
+                    <h2>Methodology Pathway</h2>
+                    <p>Physics derivations and feature engineering strategies</p>
+                </header>
+
+                <div class="glass-card mb-4 accent-top">
+                    <div class="card-header">
+                        <i data-lucide="cpu"></i>
+                        <h3>Compressor Thermodynamics</h3>
+                    </div>
+                    <p class="mb-4">The health of the compressor is heavily influenced by fouling and erosion, which manifest as drops in the pressure ratio and isentropic efficiency.</p>
+                    <ul class="clean-list">
+                        <li><strong>Pressure Ratio (PR_comp):</strong> <code>P2 / Pamb</code></li>
+                        <li><strong>Temperature Ratio:</strong> <code>T2 / Tamb</code></li>
+                        <li><strong>Isentropic Efficiency Proxy:</strong> Derived from <code>(P2/Pamb)^((γ-1)/γ)</code> compared to the actual <code>T2/Tamb</code> rise. A decline in this value is a direct indicator of fouling.</li>
+                    </ul>
+                </div>
+
+                <div class="glass-card mb-4">
+                    <div class="card-header">
+                        <i data-lucide="flame"></i>
+                        <h3>Combustor & Turbine Diagnostics</h3>
+                    </div>
+                    <ul class="clean-list">
+                        <li><strong>Combustor Pressure Loss:</strong> <code>(P2 - P3) / P2</code>. Rises with liner degradation.</li>
+                        <li><strong>Turbine Temperature Drop:</strong> <code>T3 - T4</code>. A falling drop for a given pressure ratio signals turbine erosion or tip clearance loss.</li>
+                        <li><strong>Normalized Shaft Speed:</strong> <code>RPM / √(Tamb)</code>. Corrects for aerodynamic similarity, allowing valid comparisons across different ambient conditions.</li>
+                    </ul>
+                </div>
+
+                <div class="glass-card">
+                    <div class="card-header">
+                        <i data-lucide="git-merge"></i>
+                        <h3>Hybrid Modeling (PINN)</h3>
+                    </div>
+                    <p>Instead of feeding raw sensors into a black-box model, our Neural Network takes these explicitly calculated thermodynamic ratios as inputs. The loss function is constrained by mass and energy balance equations to prevent non-physical predictions, ensuring high "Physics Consistency" scores.</p>
+                </div>
+            </section>
+
+            <!-- WORKSTREAMS SECTION -->
+            <section id="workstreams" class="tab-pane">
+                <header class="section-header">
+                    <h2>Team Workstreams</h2>
+                    <p>Real-time synced task execution roadmap</p>
+                </header>
+
+                <div class="workstream-grid">
+                    <!-- Tech Lead -->
+                    <div class="glass-card">
+                        <div class="card-header">
+                            <div class="avatar bg-accent">AN</div>
+                            <div>
+                                <h3>Anant</h3>
+                                <span class="subtitle">Tech Lead / Architect</span>
+                            </div>
+                        </div>
+                        <div class="task-list">
+                            <label class="task"><input type="checkbox"> <span>Set up Python data pipeline & hybrid architecture</span></label>
+                            <label class="task"><input type="checkbox"> <span>Create framework for real-time monitoring & anomaly detection</span></label>
+                            <label class="task"><input type="checkbox"> <span>Define test cases and benchmarks for physics consistency</span></label>
+                        </div>
+                    </div>
+
+                    <!-- AI Researcher -->
+                    <div class="glass-card">
+                        <div class="card-header">
+                            <div class="avatar bg-gray">MI</div>
+                            <div>
+                                <h3>Minisha</h3>
+                                <span class="subtitle">AI Researcher / Doc Lead</span>
+                            </div>
+                        </div>
+                        <div class="task-list">
+                            <label class="task"><input type="checkbox"> <span>Extract executive summaries from latest 2025 literature</span></label>
+                            <label class="task"><input type="checkbox"> <span>Define causal chain rules for physical faults</span></label>
+                            <label class="task"><input type="checkbox"> <span>Write comprehensive Technical Report (8-page)</span></label>
+                            <label class="task"><input type="checkbox"> <span>Draft Final Pitch Deck using presentation_guide.md</span></label>
+                        </div>
+                    </div>
+
+                    <!-- Systems / EE -->
+                    <div class="glass-card full-width">
+                        <div class="card-header">
+                            <div class="avatar-group">
+                                <div class="avatar bg-dark">PA</div>
+                                <div class="avatar bg-dark">SH</div>
+                            </div>
+                            <div>
+                                <h3>Parth & Shreyansh</h3>
+                                <span class="subtitle">Systems / UI Engineers</span>
+                            </div>
+                        </div>
+                        <div class="task-grid-2">
+                            <div class="task-col">
+                                <h4 class="mini-header text-accent">Dashboard UI/UX</h4>
+                                <label class="task"><input type="checkbox"> <span>Design and build Mission Control Dashboard (Vanilla/Vue/React)</span></label>
+                                <label class="task"><input type="checkbox"> <span>Implement Mission Replay and Interactive Visuals</span></label>
+                            </div>
+                            <div class="task-col">
+                                <h4 class="mini-header text-accent">Data & Physics</h4>
+                                <label class="task"><input type="checkbox"> <span>Find and procure additional datasets (e.g. N-CMAPSS)</span></label>
+                                <label class="task"><input type="checkbox"> <span>Research exact mathematical formulas for thermodynamic features</span></label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- LIBRARY SECTION -->
+            <section id="library" class="tab-pane">
+                <header class="section-header">
+                    <h2>Research & Literature Portal</h2>
+                    <p>Categorized repository of all research, benchmarks, and project files</p>
+                </header>
+
+                <div id="library-main-view" class="card-grid mt-6">
+                    <!-- Academic Papers Big Card -->
+                    <div class="glass-card big-category-card accent-top" onclick="openLibraryCategory('cat-papers')">
+                        <div class="card-header justify-center">
+                            <i data-lucide="book-open" class="big-icon text-accent"></i>
+                        </div>
+                        <h3 class="text-center mt-4">Academic Papers</h3>
+                        <p class="text-center text-muted mt-2">PINNs, Hybrid Architectures & Literature</p>
+                    </div>
+
+                    <!-- GitHub Repositories Big Card -->
+                    <div class="glass-card big-category-card" onclick="openLibraryCategory('cat-repos')">
+                        <div class="card-header justify-center">
+                            <i data-lucide="github" class="big-icon"></i>
+                        </div>
+                        <h3 class="text-center mt-4">Benchmark Repositories</h3>
+                        <p class="text-center text-muted mt-2">Open-source digital twins & predictive maintenance</p>
+                    </div>
+
+                    <!-- Hackathon Materials Big Card -->
+                    <div class="glass-card big-category-card" onclick="openLibraryCategory('cat-materials')">
+                        <div class="card-header justify-center">
+                            <i data-lucide="folder-kanban" class="big-icon"></i>
+                        </div>
+                        <h3 class="text-center mt-4">Hackathon Materials</h3>
+                        <p class="text-center text-muted mt-2">Plans, datasets, PPT guides & deployment</p>
+                    </div>
+                </div>
+
+                <div id="library-detail-view" class="hidden mt-6">
+                    <button class="nav-item mb-4" onclick="closeLibraryCategory()">
+                        <i data-lucide="arrow-left"></i> Back to Categories
+                    </button>
+
+                    <!-- Papers Detail -->
+                    <div id="cat-papers" class="library-category hidden">
+                        <div class="glass-card mb-4 accent-top">
+                            <div class="card-header">
+                                <i data-lucide="book-open"></i>
+                                <h3>Academic Papers</h3>
+                            </div>
+                            <div class="library-list mt-6">
+                                <a href="papers/Physics_Informed_ML_Gas_Turbine_Review_2025.pdf" class="library-item" target="_blank">
+                                    <div class="icon-box"><i data-lucide="file-text"></i></div>
+                                    <div class="item-content">
+                                        <h3>Physics-Informed ML for Intelligent Gas Turbine Digital Twins: A Review (2025)</h3>
+                                        <p><strong>Summary:</strong> Validates our architecture by introducing a 4-layer maturity framework (Physics Backbone -> AI Modeling -> Robustness & Uncertainty -> Optimization).</p>
+                                    </div>
+                                    <i data-lucide="external-link" class="action-icon"></i>
+                                </a>
+                                <a href="papers/PINN_Gas_Turbine_Trends_2024.pdf" class="library-item" target="_blank">
+                                    <div class="icon-box"><i data-lucide="file-text"></i></div>
+                                    <div class="item-content">
+                                        <h3>Physics-Informed Neural Networks for Industrial Gas Turbines</h3>
+                                        <p><strong>Summary:</strong> Comprehensive review of PINNs in gas turbine research, highlighting integration of physical constraints to ensure robust predictions.</p>
+                                    </div>
+                                    <i data-lucide="external-link" class="action-icon"></i>
+                                </a>
+                                <a href="papers/PIESRGAN_Reactive_Flows.pdf" class="library-item" target="_blank">
+                                    <div class="icon-box"><i data-lucide="file-text"></i></div>
+                                    <div class="item-content">
+                                        <h3>PIESRGANs for Lean Premixed Gas Turbine Combustors</h3>
+                                        <p><strong>Summary:</strong> Explores data-driven modeling in complex reactive flows using discriminator-supported training.</p>
+                                    </div>
+                                    <i data-lucide="external-link" class="action-icon"></i>
+                                </a>
+                                <a href="papers/Data_Driven_Kinematic_Model.pdf" class="library-item" target="_blank">
+                                    <div class="icon-box"><i data-lucide="file-text"></i></div>
+                                    <div class="item-content">
+                                        <h3>Data-Driven Kinematic Model of a Ducted Premixed Flame</h3>
+                                        <p><strong>Summary:</strong> A study on data-driven approaches to model combustion dynamics for the combustor rule-base.</p>
+                                    </div>
+                                    <i data-lucide="external-link" class="action-icon"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Repos Detail -->
+                    <div id="cat-repos" class="library-category hidden">
+                        <div class="glass-card mb-4">
+                            <div class="card-header">
+                                <i data-lucide="github"></i>
+                                <h3>Competitor Benchmark Repositories</h3>
+                            </div>
+                            <div class="library-list mt-6">
+                                <a href="https://github.com/nasim-raj-laskar/Real-Time-Aircraft-Engine-Predictive-Maintenance-System" class="library-item" target="_blank">
+                                    <div class="icon-box"><i data-lucide="github"></i></div>
+                                    <div class="item-content">
+                                        <h3>nasim-raj-laskar / Real-Time-Aircraft-Engine-Predictive-Maintenance-System</h3>
+                                        <p><strong>Analysis:</strong> Purely data-driven black box model using GRUs on C-MAPSS. We are adopting their enterprise streaming architecture and MC Dropout.</p>
+                                    </div>
+                                    <i data-lucide="github" class="action-icon"></i>
+                                </a>
+                                <a href="https://github.com/dattatejaofficial/aircraft-engine-predictive-maintenance-system" class="library-item" target="_blank">
+                                    <div class="icon-box"><i data-lucide="github"></i></div>
+                                    <div class="item-content">
+                                        <h3>dattatejaofficial / aircraft-engine-predictive-maintenance-system</h3>
+                                        <p><strong>Analysis:</strong> A hybrid XGBoost + LSTM setup. We are adopting their dual-head approach (Risk Classifier + RUL Regressor) but embedding thermodynamics.</p>
+                                    </div>
+                                    <i data-lucide="github" class="action-icon"></i>
+                                </a>
+                                <a href="https://github.com/Ocramnaig94/digital-twin-for-aircraft-engine-maintenance" class="library-item" target="_blank">
+                                    <div class="icon-box"><i data-lucide="github"></i></div>
+                                    <div class="item-content">
+                                        <h3>Ocramnaig94 / digital-twin-for-aircraft-engine-maintenance</h3>
+                                        <p><strong>Analysis:</strong> Uses MQTT and Node-RED for real-time dashboards. We are adopting their concept of a Real-Time Telemetry Producer.</p>
+                                    </div>
+                                    <i data-lucide="github" class="action-icon"></i>
+                                </a>
+                                <a href="https://github.com/GhitaMezzourDT/DigitalTwinForAircraftMaintenance" class="library-item" target="_blank">
+                                    <div class="icon-box"><i data-lucide="github"></i></div>
+                                    <div class="item-content">
+                                        <h3>GhitaMezzourDT / DigitalTwinForAircraftMaintenance</h3>
+                                        <p><strong>Analysis:</strong> Heavy MATLAB simulation for aircraft distribution systems. Shows limitation of pure simulation versus modern dashboards.</p>
+                                    </div>
+                                    <i data-lucide="github" class="action-icon"></i>
+                                </a>
+                                <a href="https://github.com/EkeminiThompson/Real-Time-Predictive-Maintenance-System-for-Aircraft-" class="library-item" target="_blank">
+                                    <div class="icon-box"><i data-lucide="github"></i></div>
+                                    <div class="item-content">
+                                        <h3>EkeminiThompson / Real-Time-Predictive-Maintenance-System-for-Aircraft-</h3>
+                                        <p><strong>Analysis:</strong> Basic Flask/Dash app for predictive maintenance. Demonstrates a simple, monolithic pipeline.</p>
+                                    </div>
+                                    <i data-lucide="github" class="action-icon"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Materials Detail -->
+                    <div id="cat-materials" class="library-category hidden">
+                        <div class="glass-card">
+                            <div class="card-header">
+                                <i data-lucide="folder-kanban"></i>
+                                <h3>Hackathon Materials & Project Files</h3>
+                            </div>
+                            <div class="library-list mt-6">
+                                <a href="plan.md" class="library-item" target="_blank">
+                                    <div class="icon-box"><i data-lucide="file-text"></i></div>
+                                    <div class="item-content">
+                                        <h3>Master Project Plan (plan.md)</h3>
+                                        <p>The original markdown blueprint detailing the 6-layer architecture and problem statement justification.</p>
+                                    </div>
+                                    <i data-lucide="external-link" class="action-icon"></i>
+                                </a>
+                                <a href="presentation_guide.md" class="library-item" target="_blank">
+                                    <div class="icon-box"><i data-lucide="presentation"></i></div>
+                                    <div class="item-content">
+                                        <h3>AEROTHON 2026 Presentation Guide</h3>
+                                        <p>Slide-by-slide execution guide mapping our Physics-Informed Digital Twin strategy onto the official HAL x IITI pitch deck template.</p>
+                                    </div>
+                                    <i data-lucide="external-link" class="action-icon"></i>
+                                </a>
+                                <a href="render_hosting_guide.md" class="library-item" target="_blank">
+                                    <div class="icon-box"><i data-lucide="server"></i></div>
+                                    <div class="item-content">
+                                        <h3>Deployment Guide: Hosting on Render</h3>
+                                        <p>Step-by-step instructions for deploying this Node.js/Vite dashboard to production using Render.</p>
+                                    </div>
+                                    <i data-lucide="external-link" class="action-icon"></i>
+                                </a>
+                                <a href="train.csv" class="library-item" target="_blank">
+                                    <div class="icon-box"><i data-lucide="database"></i></div>
+                                    <div class="item-content">
+                                        <h3>Official Dataset (Train & Test CSVs)</h3>
+                                        <p>Variables: Altitude, Mach, Tamb, Pamb, RPM, Fuel Flow, P2, T2, P3, T3, P4, T4</p>
+                                    </div>
+                                    <i data-lucide="download" class="action-icon"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <!-- MARKDOWN VIEWER MODAL (NOTION STYLE) -->
+    <div id="md-modal" class="md-modal hidden">
+        <div class="md-modal-header">
+            <span id="md-modal-title" class="md-modal-title">Document</span>
+            <button id="md-close-btn" class="icon-btn"><i data-lucide="x"></i></button>
+        </div>
+        <div class="md-modal-content-area">
+            <div id="md-content" class="notion-like-md"></div>
+        </div>
+    </div>
+
+    <script type="module" src="/js/app.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
