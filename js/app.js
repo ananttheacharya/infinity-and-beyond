@@ -144,6 +144,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const hudThrust = document.getElementById('hud-thrust');
     const hudTsfc = document.getElementById('hud-tsfc');
     const hudPhysics = document.getElementById('hud-physics');
+    const opAlt = document.getElementById('op-alt');
+    const opMach = document.getElementById('op-mach');
+    const opTamb = document.getElementById('op-tamb');
+    const opRpm = document.getElementById('op-rpm');
+    const opFuel = document.getElementById('op-fuel');
     
     const themeColor = '#0ea5e9'; // Sky Blue
     
@@ -204,6 +209,66 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    const vCtx = document.getElementById('violationChart');
+    let violationChart = null;
+    if (vCtx) {
+        violationChart = new Chart(vCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Project Icarus (GRU)',
+                        data: [],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Project Titan (XGBoost)',
+                        data: [],
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Our PINN',
+                        data: [],
+                        borderColor: '#4ade80',
+                        backgroundColor: 'rgba(74, 222, 128, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 0 },
+                scales: {
+                    x: {
+                        display: true,
+                        grid: { color: 'rgba(255, 124, 155, 0.1)' },
+                        ticks: { color: '#666', font: { family: 'DotGothic16' } }
+                    },
+                    y: {
+                        display: true,
+                        title: { display: true, text: 'Violation %', color: '#64748b' },
+                        grid: { color: 'rgba(255, 124, 155, 0.1)' },
+                        ticks: { color: '#666', font: { family: 'DotGothic16' } },
+                        min: 0,
+                        max: 100
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: '#666' } }
+                }
+            }
+        });
+    }
+
     const maxDataPoints = 50;
 
     socket.on('telemetry_update', (data) => {
@@ -228,22 +293,46 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         telemetryChart.update();
 
-        // Update Gauges (Safe Fallbacks)
-        const setGauge = (element, value) => {
+        // Update Violation Chart
+        if (violationChart) {
+            violationChart.data.labels.push(data.cycle);
+            violationChart.data.datasets[0].data.push(data.icarus_violation);
+            violationChart.data.datasets[1].data.push(data.titan_violation);
+            violationChart.data.datasets[2].data.push(data.pinn_violation);
+            
+            if (violationChart.data.labels.length > maxDataPoints) {
+                violationChart.data.labels.shift();
+                violationChart.data.datasets[0].data.shift();
+                violationChart.data.datasets[1].data.shift();
+                violationChart.data.datasets[2].data.shift();
+            }
+            violationChart.update();
+        }
+
+        // Update Subsystem Health Stats (previously Gauges)
+        const setHealthStat = (element, value) => {
             if (!element) return;
             const safeValue = (value !== undefined && !isNaN(value)) ? value : 0;
             const valNum = Math.round(safeValue);
             element.innerText = valNum + '%';
-            // Conic gradient for progress (Pink/Cyberpunk colors: Green/Yellow/Pink)
-            const color = valNum > 75 ? '#4ade80' : (valNum > 40 ? '#f59e0b' : 'var(--accent-pink)');
-            element.style.background = `conic-gradient(${color} ${valNum}%, var(--bg-main) 0%)`;
+            
+            // Text color based on health
+            const color = valNum > 75 ? '#4ade80' : (valNum > 40 ? '#f59e0b' : '#ef4444');
+            element.style.color = color;
         };
         
-        setGauge(gaugeComp, data.comp_health);
-        setGauge(gaugeComb, data.comb_health);
-        setGauge(gaugeTurb, data.turb_health);
+        setHealthStat(gaugeComp, data.comp_health);
+        setHealthStat(gaugeComb, data.comb_health);
+        setHealthStat(gaugeTurb, data.turb_health);
         
-        // Update Stats (Safe Fallbacks)
+        // Update Operating Conditions
+        if (opAlt) opAlt.innerText = (data.op_altitude !== undefined ? data.op_altitude.toFixed(0) : '--') + ' m';
+        if (opMach) opMach.innerText = data.op_mach !== undefined ? data.op_mach.toFixed(3) : '--';
+        if (opTamb) opTamb.innerText = (data.op_tamb !== undefined ? data.op_tamb.toFixed(1) : '--') + ' K';
+        if (opRpm) opRpm.innerText = data.op_rpm !== undefined ? data.op_rpm.toFixed(0) : '--';
+        if (opFuel) opFuel.innerText = (data.op_fuel !== undefined ? data.op_fuel.toFixed(4) : '--') + ' kg/s';
+
+        // Update HUD Stats (Safe Fallbacks)
         if (hudThrust) {
             const tVal = (data.thrust !== undefined && !isNaN(data.thrust)) ? data.thrust : 0;
             hudThrust.innerText = Math.round(tVal) + " N";
@@ -273,49 +362,4 @@ document.addEventListener('DOMContentLoaded', () => {
             liveIndicator.style.color = "#ef4444"; // Red
         }
     });
-
-    // Initialize Violation Chart
-    const vCtx = document.getElementById('violationChart');
-    if (vCtx) {
-        new Chart(vCtx, {
-            type: 'bar',
-            data: {
-                labels: ['Icarus (GRU)', 'Titan (XGBoost)', 'Our PINN'],
-                datasets: [{
-                    label: 'Thermodynamic Violation Rate (%)',
-                    data: [42.5, 38.2, 0.0],
-                    backgroundColor: [
-                        'rgba(239, 68, 68, 0.5)', // red
-                        'rgba(245, 158, 11, 0.5)', // yellow
-                        'rgba(74, 222, 128, 0.8)'  // green
-                    ],
-                    borderColor: [
-                        '#ef4444',
-                        '#f59e0b',
-                        '#4ade80'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100,
-                        grid: { color: 'rgba(255, 124, 155, 0.1)' },
-                        ticks: { color: '#666', font: { family: 'DotGothic16' } }
-                    },
-                    x: {
-                        grid: { color: 'rgba(255, 124, 155, 0.1)' },
-                        ticks: { color: '#666', font: { family: 'DotGothic16' } }
-                    }
-                },
-                plugins: {
-                    legend: { display: false }
-                }
-            }
-        });
-    }
 });

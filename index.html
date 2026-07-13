@@ -79,19 +79,43 @@
                     <p class="text-accent glow-text" id="live-indicator">LIVE TELEMETRY FEED ACTIVE</p>
                 </header>
                 
+                <!-- OPERATING CONDITIONS ROW -->
+                <div class="mt-4" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem;">
+                    <div class="sci-fi-panel center-content" style="padding: 0.75rem;">
+                        <h4 style="font-size: 0.75rem; color: var(--text-muted); margin:0;">Altitude</h4>
+                        <div style="font-family: var(--font-mono); color: var(--text-main); font-size: 1.1rem; margin-top:0.25rem;" id="op-alt">-- m</div>
+                    </div>
+                    <div class="sci-fi-panel center-content" style="padding: 0.75rem;">
+                        <h4 style="font-size: 0.75rem; color: var(--text-muted); margin:0;">Mach Number</h4>
+                        <div style="font-family: var(--font-mono); color: var(--text-main); font-size: 1.1rem; margin-top:0.25rem;" id="op-mach">--</div>
+                    </div>
+                    <div class="sci-fi-panel center-content" style="padding: 0.75rem;">
+                        <h4 style="font-size: 0.75rem; color: var(--text-muted); margin:0;">Tamb</h4>
+                        <div style="font-family: var(--font-mono); color: var(--text-main); font-size: 1.1rem; margin-top:0.25rem;" id="op-tamb">-- K</div>
+                    </div>
+                    <div class="sci-fi-panel center-content" style="padding: 0.75rem;">
+                        <h4 style="font-size: 0.75rem; color: var(--text-muted); margin:0;">Shaft RPM</h4>
+                        <div style="font-family: var(--font-mono); color: var(--text-main); font-size: 1.1rem; margin-top:0.25rem;" id="op-rpm">--</div>
+                    </div>
+                    <div class="sci-fi-panel center-content" style="padding: 0.75rem;">
+                        <h4 style="font-size: 0.75rem; color: var(--text-muted); margin:0;">Fuel Flow</h4>
+                        <div style="font-family: var(--font-mono); color: var(--text-main); font-size: 1.1rem; margin-top:0.25rem;" id="op-fuel">-- kg/s</div>
+                    </div>
+                </div>
+
                 <!-- SUBSYSTEM HEALTH ROW -->
-                <div class="subsystem-grid mt-4">
-                    <div class="sci-fi-panel center-content">
-                        <h4>Compressor Health</h4>
-                        <div class="circular-gauge" id="gauge-comp">--%</div>
+                <div class="hud-grid mt-4">
+                    <div class="sci-fi-panel center-content" style="padding: 1.5rem;">
+                        <div class="hud-stat-label mb-2">Compressor Health</div>
+                        <div class="hud-stat-value text-accent" id="gauge-comp" style="font-size: 2.5rem;">--%</div>
                     </div>
-                    <div class="sci-fi-panel center-content">
-                        <h4>Combustor Health</h4>
-                        <div class="circular-gauge" id="gauge-comb">--%</div>
+                    <div class="sci-fi-panel center-content" style="padding: 1.5rem;">
+                        <div class="hud-stat-label mb-2">Combustor Health</div>
+                        <div class="hud-stat-value text-accent" id="gauge-comb" style="font-size: 2.5rem;">--%</div>
                     </div>
-                    <div class="sci-fi-panel center-content">
-                        <h4>Turbine Health</h4>
-                        <div class="circular-gauge" id="gauge-turb">--%</div>
+                    <div class="sci-fi-panel center-content" style="padding: 1.5rem;">
+                        <div class="hud-stat-label mb-2">Turbine Health</div>
+                        <div class="hud-stat-value text-accent" id="gauge-turb" style="font-size: 2.5rem;">--%</div>
                     </div>
                 </div>
 
