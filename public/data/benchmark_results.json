@@ -1,0 +1,31 @@
+{
+  "variants": [
+    {
+      "name": "Baseline-Raw",
+      "rmse": 0.027619248256087303,
+      "tsfc_rmse": 0.0011924654245376587
+    },
+    {
+      "name": "Baseline-PhysFeat",
+      "rmse": 0.03244805335998535,
+      "tsfc_rmse": 0.003347589634358883
+    },
+    {
+      "name": "Full Model",
+      "rmse": 0.03306549787521362,
+      "tsfc_rmse": 0.004208707716315985
+    }
+  ],
+  "surrogate": {
+    "slow_path_s": 0.1500850000011269,
+    "fast_path_s": 0.00016250000044237822,
+    "surrogate_ms": 0.0027083333407063037,
+    "speedup_x": 923.599997492593,
+    "n_params": 2565
+  },
+  "calibration": {
+    "coverage_1std_pct": 36.666667461395264,
+    "n_held_out": 60,
+    "description": "% of true values falling within predicted mean \u00b1 1 std on held-out test engines"
+  }
+}

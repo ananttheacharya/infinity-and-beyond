@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AeroTwin PCMN | Live Telemetry</title>
+    <link rel="stylesheet" href="/css/index.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="dashboard">
+        <header>
+            <div class="header-left">
+                <h1>AeroTwin PCMN</h1>
+                <div class="status-indicator">
+                    <span id="connection-dot" class="dot offline"></span>
+                    <span id="connection-text">OFFLINE</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="stat-box">
+                    <label>Engine Cycle</label>
+                    <div class="value" id="cycle-val">--</div>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid-container">
+            <!-- Left Column: Health Metrics -->
+            <div class="column">
+                <div class="panel">
+                    <h3>Overall Health (PCMN)</h3>
+                    <div class="big-value" id="overall-health-val">--%</div>
+                    <div class="sub-value">Uncertainty: ±<span id="uncertainty-val">--</span>%</div>
+                </div>
+                <div class="panel">
+                    <h3>Subsystem Health</h3>
+                    <ul class="health-list">
+                        <li>Compressor: <span id="comp-health-val">--%</span></li>
+                        <li>Combustor: <span id="comb-health-val">--%</span></li>
+                        <li>Turbine: <span id="turb-health-val">--%</span></li>
+                    </ul>
+                </div>
+                <div class="panel">
+                    <h3>Physics Consistency Score</h3>
+                    <div class="big-value physics-glow" id="physics-score-val">--</div>
+                </div>
+            </div>
+
+            <!-- Center Column: Digital Twin Vis & Performance -->
+            <div class="column center-column">
+                <div class="panel twin-panel">
+                    <h3>Digital Twin Status</h3>
+                    <div class="engine-visual">
+                        <!-- Abstract engine schematic -->
+                        <div class="engine-core" id="engine-core-vis">
+                            <div class="compressor-stage"></div>
+                            <div class="combustor-stage"></div>
+                            <div class="turbine-stage"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="panel double-panel">
+                    <h3>Performance Output</h3>
+                    <div class="perf-metrics">
+                        <div class="metric">
+                            <label>Thrust</label>
+                            <div class="val"><span id="thrust-val">--</span> N</div>
+                        </div>
+                        <div class="metric">
+                            <label>TSFC</label>
+                            <div class="val"><span id="tsfc-val">--</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Ablation & Raw Telemetry -->
+            <div class="column">
+                <div class="panel">
+                    <h3>Thermodynamic Violations</h3>
+                    <canvas id="violationChart"></canvas>
+                </div>
+                <div class="panel">
+                    <h3>Live Telemetry Input</h3>
+                    <div class="telemetry-grid">
+                        <div class="tel-item"><label>Alt</label><span id="op-alt">--</span> m</div>
+                        <div class="tel-item"><label>Mach</label><span id="op-mach">--</span></div>
+                        <div class="tel-item"><label>Tamb</label><span id="op-tamb">--</span> K</div>
+                        <div class="tel-item"><label>Pamb</label><span id="op-pamb">--</span> Pa</div>
+                        <div class="tel-item"><label>RPM</label><span id="op-rpm">--</span></div>
+                        <div class="tel-item"><label>Fuel</label><span id="op-fuel">--</span></div>
+                    </div>
+                </div>
+                <div class="panel benchmark-panel">
+                    <h3>Surrogate Speed (vs Physics Solver)</h3>
+                    <div class="speed-val" id="speedup-val">--x</div>
+                    <div class="sub-val" id="latency-val">-- ms/sample</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="/js/main.js"></script>
+</body>
+</html>

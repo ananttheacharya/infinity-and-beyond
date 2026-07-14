@@ -1,798 +1,480 @@
-# 🔥 ROAST.MD — A Brutal, Scientific Post-Mortem of "Zero and Already Behind"
+# 🔥 ROAST.MD — Revision 2 Post-Mortem of "Zero and Already Behind"
 
-**Date:** July 13, 2026  
+**Date:** July 14, 2026  
 **Evaluator:** Independent Code & Architecture Auditor  
-**Scope:** Every file in the repository, all referenced papers, the hackathon deliverables, all Python training scripts, models, the dashboard, the "judge," and the benchmark.  
-**Verdict Summary:** This project is **a well-disguised illusion** — an impressive-looking dashboard wrapped around misused data, hardcoded metrics, and a "physics-informed" architecture that does not actually inform itself with physics in any meaningful way. It would not survive 60 seconds of technical questioning from a competent aerospace judge.
+**Scope:** Full re-audit after Revision 2 changes guided by `Zero_and_Already_Behind_Scientific_Proposal 1.md` and `DASHBOARD_BUILD_GUIDE.md`. Every updated Python file, the benchmark output, the training output, and the telemetry streamer were re-examined.  
+**Prior Audit:** The original `roast.md` (July 13) identified 10+ critical defects. This revision checks which were actually fixed, which were partially fixed, and which new problems the fixes introduced.
+
+---
+
+## EXECUTIVE SUMMARY
+
+**Revision 2 fixed the worst sins but introduced new ones.** The hardcoded benchmark is gone. The physics loss now constrains outputs. There's a proper train/val/test split. An ablation framework exists. These are real, material improvements — the project has gone from "theatre" to "an honest attempt with serious engineering problems."
+
+But the training output you just showed me tells a brutal story:
+
+```
+Baseline-Raw:       TSFC violation=100.00%  Overall-health RMSE=0.0879
+Baseline-PhysFeat:  TSFC violation=99.99%   Overall-health RMSE=0.0879
+Full Model:         TSFC violation=99.99%   Overall-health RMSE=0.0879
+Coverage (mean ± 1 std): 0.0%
+```
+
+**Every model variant has ~100% TSFC violation. All three produce identical RMSE. The uncertainty calibration coverage is literally 0%.** The physics-constrained loss made zero measurable difference. The ablation — which the Scientific Proposal correctly identified as "your single strongest visual" — currently proves that the physics constraints **do not help at all**.
+
+And the telemetry streamer **still cheats** (lines 132–133 of the updated file). The exact same `constrained_tsfc = fuel_flow_g / thrust` and `pinn_violation = 0.0` hack survived the rewrite.
 
 ---
 
 ## TABLE OF CONTENTS
 
-1. [The Dataset: Mishandled, Misunderstood, and Misdocumented](#1-the-dataset-mishandled-misunderstood-and-misdocumented)
-2. [The "Physics-Informed" Claim: A Lie by Degrees](#2-the-physics-informed-claim-a-lie-by-degrees)
-3. [The PINN Model: A Vanilla MLP in Disguise](#3-the-pinn-model-a-vanilla-mlp-in-disguise)
-4. [The Physics Loss Function: Mathematically Impotent](#4-the-physics-loss-function-mathematically-impotent)
-5. [The Benchmark: Rigged to Win](#5-the-benchmark-rigged-to-win)
-6. [The Telemetry Streamer: The Crime Scene](#6-the-telemetry-streamer-the-crime-scene)
-7. [Training Pipeline: Comically Broken](#7-training-pipeline-comically-broken)
-8. [The "Competitor Baselines": Strawmen on Life Support](#8-the-competitor-baselines-strawmen-on-life-support)
-9. [The Academic Papers: Referenced but Not Read](#9-the-academic-papers-referenced-but-not-read)
-10. [Deliverables Alignment: A Checklist of Failures](#10-deliverables-alignment-a-checklist-of-failures)
-11. [Could This Be Replaced by a Simple AI-Generated Project?](#11-could-this-be-replaced-by-a-simple-ai-generated-project)
-12. [The Dashboard: Pretty, But a Potemkin Village](#12-the-dashboard-pretty-but-a-potemkin-village)
-13. [Proposed Fixes: A Complete Rebuild Plan](#13-proposed-fixes-a-complete-rebuild-plan)
+1. [What Was Actually Fixed (Credit Where Due)](#1-what-was-actually-fixed)
+2. [The Training Output: A Model That Hasn't Learned](#2-the-training-output-a-model-that-hasnt-learned)
+3. [The Telemetry Streamer: STILL Cheating](#3-the-telemetry-streamer-still-cheating)
+4. [The Loss Function: Fixed in Spirit, Broken in Practice](#4-the-loss-function-fixed-in-spirit-broken-in-practice)
+5. [The Dataset Split: Good Idea, Problematic Implementation](#5-the-dataset-split-good-idea-problematic-implementation)
+6. [The ThermodynamicsEngine: Better, But Still Incomplete](#6-the-thermodynamicsengine-better-but-still-incomplete)
+7. [The Model Architecture: Undersized for the Problem](#7-the-model-architecture-undersized-for-the-problem)
+8. [The Benchmark: Honest Now, But Revealing Failure](#8-the-benchmark-honest-now-but-revealing-failure)
+9. [Missing Deliverables: Dashboard Rebuild Not Started](#9-missing-deliverables-dashboard-rebuild-not-started)
+10. [Remaining Critical Fixes](#10-remaining-critical-fixes)
+11. [Revised Verdict & Scorecard](#11-revised-verdict--scorecard)
 
 ---
 
-## 1. The Dataset: Mishandled, Misunderstood, and Misdocumented
+## 1. What Was Actually Fixed
 
-### The Damning Evidence
+Before tearing into what's broken, let's acknowledge what Revision 2 got right — these were real engineering improvements, not cosmetic:
 
-All the CSVs in the `Dataset/` folder — `turbojet_complete_dataset.csv`, `train.csv`, `test.csv`, `ground_truth.csv` — are **provided by the hackathon itself**. However, the project's own `system_architecture.md` (line 19) incorrectly states:
+| Original Defect | Status | What Changed |
+|----------------|--------|-------------|
+| Physics loss constrains inputs, not outputs | ✅ **FIXED** | [loss.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/models/loss.py) now has `PhysicsConstrainedLoss` with TSFC consistency and health consistency constraints on the model's **outputs** |
+| No train/test split | ✅ **FIXED** | [dataset.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/data_pipeline/dataset.py) and [train.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/training/train.py) implement engine-level split: Train engines, Val engines (7,8), Test engines (9,10) |
+| 10 epochs of training | ✅ **FIXED** | Now trains for 300 epochs with patience-20 early stopping |
+| Benchmark uses hardcoded print statements | ✅ **FIXED** | [benchmark.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/evaluation/benchmark.py) computes all metrics from actual model predictions |
+| No ablation comparison | ✅ **FIXED** | 3-variant ablation (Baseline-Raw, Baseline-PhysFeat, Full Model) with the same architecture |
+| PINN inputs unnormalized | ✅ **FIXED** | `StandardScaler` fitted on train only, applied to all splits |
+| `hidden_dim=128` over-parameterized | ✅ **FIXED** | Reduced to `hidden_dim=32` with `weight_decay=1e-4` |
+| Competitor baseline trained on random noise | ✅ **FIXED** | The `train_baseline.py` strawman is no longer used; all comparisons are now internal ablations |
+| MC Dropout calibration not measured | ✅ **FIXED** | [benchmark.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/evaluation/benchmark.py#L80-L95) computes actual coverage percentage |
+| Surrogate speed not measured | ✅ **FIXED** | Benchmark now includes real timing with warmup |
+| Results not saved for dashboard | ✅ **FIXED** | Saves `benchmark_results.json` to `public/data/` |
 
-> "Because the provided local NASA zip archive was corrupted during extraction, we are using an **internally generated mock dataset** (`turbojet_complete_dataset.csv`) that simulates the degradation profile of the CMAPSS engines"
-
-**This is the project's own documentation lying about its own data source.** The dataset is not "internally generated" — it comes from the hackathon organizers. This means the `system_architecture.md` either:
-1. Was written by someone who didn't know where the data came from, or
-2. Was generated by an AI prompt that hallucinated the provenance
-
-Either way, it destroys credibility in front of judges. If a team can't correctly describe where their data comes from, why should anyone trust their model?
-
-### The Actual Data Problems
-
-- **`turbojet_complete_dataset.csv`** has **300 rows** containing both sensors AND targets in one file. While this is hackathon-provided data, the project uses it without any rigor.
-- **`train.csv`** has **240 rows** across multiple engines, and `test.csv` has **60 rows**. These CSV files — also hackathon-provided — are **never used by any training script**. The project only ever loads `turbojet_complete_dataset.csv`.
-- There is a **3.7 GB N-CMAPSS HDF5 file** (`N-CMAPSS_DS03-012.h5`) sitting in the Dataset folder, **completely unused**. This is the gold-standard NASA dataset for turbofan prognostics. If its parameter schema is compatible with the hackathon's turbojet dataset (both deal with multi-stage engine degradation with similar sensor types), it could be a powerful supplementary training source to dramatically increase data volume and diversity. The team downloaded it but never investigated whether it could be used.
-
-### Why This Is Still Fatal
-
-The **entire model pipeline** — PINN training, baseline training, telemetry streamer, benchmark — trains on `turbojet_complete_dataset.csv` **with no train/test split**. The model is evaluated on the same data it trains on. There is:
-
-- ❌ No train/validation/test split of any kind
-- ❌ No cross-engine generalization testing
-- ❌ No use of `train.csv` / `test.csv` / `ground_truth.csv` (the structured split the hackathon presumably intended)
-- ❌ No investigation of whether the N-CMAPSS data could supplement training
-- ❌ Documentation that falsely claims the data is "internally generated"
-
-### The N-CMAPSS Opportunity
-
-The N-CMAPSS dataset (`N-CMAPSS_DS03-012.h5`) contains flight-realistic degradation data for turbofan engines with sensor columns that overlap significantly with the hackathon's schema (temperatures, pressures, RPM, fuel flow, health indices). If the parameter mapping is validated (i.e., confirming that the N-CMAPSS sensor positions map to the same physical locations as the hackathon's P2/T2/P3/T3/P4/T4 nomenclature), this dataset could provide **thousands** of additional training samples with realistic degradation curves — transforming the model from toy-scale to genuinely competitive. This is a recommended investigation for the fix phase.
-
-### Specific Code Evidence
-
-| File | Line | What It Does |
-|------|------|-------------|
-| [train_pinn.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/training/train_pinn.py#L15) | 15 | `load_real_data(csv_path='Dataset/turbojet_complete_dataset.csv')` — loads data but without any train/test split |
-| [train_baselines.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/models/train_baselines.py#L20) | 20, 54 | Both XGBoost and GRU train on the same CSV with no split |
-| [train_baseline.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/training/train_baseline.py#L12-L20) | 12-20 | `generate_mock_raw_data()` — literally `np.random.uniform(0, 1, (num_samples, 10))`. The "competitor baseline" is trained on pure random noise instead of the actual data |
-| [system_architecture.md](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/docs/system_architecture.md#L19) | 19 | Falsely claims the dataset is "internally generated mock" — it's hackathon-provided |
+**This is genuine progress.** The structural honesty issues identified in the original roast have been mostly addressed. But the model **still doesn't work**, and some critical issues from the original audit survived intact.
 
 ---
 
-## 2. The "Physics-Informed" Claim: A Lie by Degrees
+## 2. The Training Output: A Model That Hasn't Learned
 
-### What "Physics-Informed" Actually Means in the Literature
+### The Numbers Don't Lie
 
-The referenced paper (Farhat et al., 2025 — "Physics-Informed ML for Intelligent Gas Turbine Digital Twins") defines a **4-layer maturity framework**:
+From the training output you shared:
 
-1. **Physics Backbone**: Embedding governing PDEs (Navier-Stokes, energy balance, mass conservation) directly into the loss function or architecture
-2. **AI Modeling**: Using neural networks as surrogates for high-fidelity simulations
-3. **Robustness & Uncertainty**: Properly calibrated uncertainty quantification
-4. **Optimization**: Using the digital twin for operational optimization
+| Variant | Final Train Loss | Final Val Loss | Converging? |
+|---------|-----------------|---------------|-------------|
+| Baseline-Raw | 211,030,058 | 269,755,584 | Slowly, still dropping |
+| Baseline-PhysFeat | 531,626,954 | 612,562,368 | Slowly, still dropping |
+| Full Model | 592,865,962 | 659,882,304 | Slowly, still dropping |
 
-Real PINNs (Raissi et al., 2019) solve this by embedding the **residual of governing differential equations** into the loss function:
+### Problem 1: The losses are in the hundreds of millions
 
-$$\mathcal{L}_{physics} = \sum_i \left\| \frac{\partial u}{\partial t} + \mathcal{N}[u] \right\|^2$$
+These are **raw MSE losses with no normalization** on the target values. The Thrust_N column has values in the range ~20,000–60,000 N. A single squared error on thrust dominates: `(50000 - 25000)² = 625,000,000`. This means:
 
-where $\mathcal{N}$ is a differential operator encoding the physical law.
+- **The loss is completely dominated by the Thrust head** — the health heads (values 0-1, squared errors ~0.001) contribute essentially nothing to the gradient
+- The model is trying to minimize `MSE(thrust_pred, thrust_true)` and effectively ignoring all 5 other outputs
+- This is why all three variants give identical RMSE=0.0879 for overall health — the health heads barely get gradient signal
 
-### What This Project Actually Does
+### Problem 2: Baseline-Raw outperforms the physics-constrained model
 
-The entire "physics" of this project is contained in [thermodynamics.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/data_pipeline/thermodynamics.py) — a **65-line file** that computes:
+Look at the final losses:
+- **Baseline-Raw:** 269M val loss — **lowest**
+- **Baseline-PhysFeat:** 612M val loss — 2.3× worse
+- **Full Model:** 659M val loss — 2.4× worse
 
-1. `PR_comp = P2 / Pamb` — a simple division (pressure ratio)
-2. `PR_turb = P4 / P3` — another simple division
-3. `Comp_Isentropic_Efficiency` — the textbook formula
-4. `Combustion_Temp_Rise = T3 - T2` — a subtraction
-5. `Normalized_RPM = RPM / sqrt(Tamb)` — corrected speed
+The physics features and constraints are **making the model worse**, not better. This is the exact opposite of what you need to demonstrate. The ablation — which the Scientific Proposal correctly calls "your single strongest visual" — currently proves that your entire thesis is wrong.
 
-**That's it.** Five features derived by basic arithmetic. This is **feature engineering**, not physics-informed ML. Any sophomore aerospace student can compute these with a calculator. There is:
+### Problem 3: No early stopping triggered
 
-- ❌ **No mass balance equation** (continuity: $\dot{m}_{in} = \dot{m}_{out}$)
-- ❌ **No energy balance** (First Law of Thermodynamics applied to each component)
-- ❌ **No enthalpy calculation** ($h = c_p \cdot T$)
-- ❌ **No combustor efficiency** (based on heat release vs. fuel energy content)
-- ❌ **No turbine work extraction** ($W_t = \dot{m} \cdot c_p \cdot (T_3 - T_4)$)
-- ❌ **No compressor work input** ($W_c = \dot{m} \cdot c_p \cdot (T_2 - T_{amb})$)
-- ❌ **No thrust equation** ($F = \dot{m}(V_e - V_0) + (P_e - P_0) A_e$)
-- ❌ **No nozzle model** at all
-- ❌ **No fuel-air ratio computation** (despite being listed in `plan.md` as a planned feature)
-- ❌ **No turbine isentropic efficiency** (listed in `plan.md`, never implemented)
-- ❌ **No governing PDE residuals in the loss function**
-- ❌ **No thermodynamic cycle model** (Brayton cycle analysis)
+None of the three variants triggered early stopping. All three ran the full 300 epochs and were still improving. This means:
+- The `patience=20` is working but the models need significantly more epochs
+- Or the learning rate is too high/too low for convergence
+- The losses are plateau-ing in the hundreds of millions, suggesting a fundamental scaling issue
 
-The `ThermodynamicsEngine` doesn't even use the `Fuel_Flow` column. The most critical measurement for a turbojet engine's performance — the fuel mass flow rate — is completely ignored in the physics layer.
+### Problem 4: The benchmark confirms total failure
 
-### The "Grey Box" Is Actually a Transparent Box with Nothing Inside
+```
+Baseline-Raw:       TSFC violation=100.00%  Overall-health RMSE=0.0879
+Baseline-PhysFeat:  TSFC violation=99.99%   Overall-health RMSE=0.0879
+Full Model:         TSFC violation=99.99%   Overall-health RMSE=0.0879
+```
 
-The architecture document calls this the "Grey Box" approach. In reality:
-- A grey-box model combines a physics-based simulation with data-driven correction
-- This project has no physics-based simulation at all
-- It computes 5 trivial ratios and subtractions, then feeds them to a standard MLP
-- This is a **white-box feature engineering step** followed by a **black-box MLP** — the exact thing the plan claims to avoid
+**100% TSFC violation** means the model's predicted TSFC has absolutely no relationship to `FuelFlow / Thrust`. The physics constraint in the loss function is present but ineffective — the model hasn't learned the TSFC relationship at all.
+
+**Identical RMSE** across all three variants means the physics features and constraints made zero measurable difference to health prediction accuracy.
+
+**0% calibration coverage** means the MC-Dropout uncertainty bands are so narrow that the true value never falls within them — the model is confidently wrong about everything.
 
 ---
 
-## 3. The PINN Model: A Vanilla MLP in Disguise
+## 3. The Telemetry Streamer: STILL Cheating
 
-### The Architecture ([pinn.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/models/pinn.py))
+### The Crime That Survived the Rewrite
 
-```python
-self.shared_fc1 = nn.Linear(input_dim, hidden_dim)   # Linear layer
-self.shared_fc2 = nn.Linear(hidden_dim, hidden_dim)   # Linear layer
-self.shared_fc3 = nn.Linear(hidden_dim, hidden_dim)   # Linear layer
-self.mc_dropout = nn.Dropout(p=dropout_rate)           # Standard dropout
+[telemetry_streamer.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/evaluation/telemetry_streamer.py#L131-L133), lines 131–133:
 
-# 6 output heads — all just nn.Linear(hidden_dim, 1)
-self.compressor_head = nn.Linear(hidden_dim, 1)
-self.combustor_head = nn.Linear(hidden_dim, 1)
-# ... etc
-```
-
-This is a **3-layer Multi-Layer Perceptron (MLP) with 6 linear output heads and ReLU activation**. There is absolutely nothing "physics-informed" about this architecture. Specifically:
-
-- **No residual connections** for better gradient flow
-- **No batch normalization** or layer normalization
-- **No skip connections** between physics features and output heads
-- **No physics-based decoder** (e.g., encoding the Brayton cycle equations in the architecture)
-- **No temporal modeling** — it processes each row independently with no notion of cycles, time series, or degradation trajectory
-- **No engine state** — the "Digital Twin" has no state. It's a stateless function approximator. A digital twin by definition maintains an evolving state representation
-- **No inter-head coupling** — the compressor head doesn't influence the turbine head, despite the fact that in a real turbojet, compressor degradation directly affects turbine inlet conditions
-- **3 shared layers of width 128** is extremely shallow for multi-task learning across 6 different physical quantities with fundamentally different scales and units
-
-### MC Dropout: Correctly Implemented but Meaningless
-
-The `predict_with_uncertainty()` method is technically correct — it runs multiple forward passes with dropout active and computes mean/std. However:
-
-- The uncertainty is **not calibrated** against any held-out data
-- With **only 300 training samples** and **no validation set**, the uncertainty bounds are pure noise
-- The document claims "Bayesian Uncertainty" — MC Dropout is an **approximation** to Bayesian inference, not the same thing. The difference matters for aerospace applications
-- The 30 MC samples are reasonable in number but meaningless when the model itself is trained with no proper split or validation
-
----
-
-## 4. The Physics Loss Function: Mathematically Impotent
-
-### The Implementation ([loss.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/models/loss.py))
-
-```python
-# Physics Violation Penalty (e.g., Isentropic Efficiency bounds)
-eff = physics_features[:, 2]  # Assuming index 2 is efficiency
-penalty_high = torch.relu(eff - 1.0)
-penalty_low = torch.relu(-eff)
-physics_penalty = torch.mean(penalty_high + penalty_low)
-```
-
-### The Problems
-
-1. **It penalizes the INPUT features, not the OUTPUT predictions.** Read that again. `physics_features[:, 2]` is the **pre-computed isentropic efficiency from the data pipeline** — it's an input to the network, not an output. The penalty is checking whether the **input data** violates physics, not whether the **model's predictions** violate physics. The gradients from this penalty do not flow into the model in a meaningful way to constrain its outputs.
-
-2. **The penalty is trivially satisfied.** The isentropic efficiency computed from the hackathon dataset will naturally fall in `[0, 1]` because it represents real engine conditions within normal operating ranges. So `physics_penalty ≈ 0` for every single batch, making `gamma * physics_penalty` negligible. The model is just minimizing MSE.
-
-3. **There are no physics constraints on the outputs.** The model predicts 6 quantities:
-   - Compressor Health, Combustor Health, Turbine Health — bounded by sigmoid (0-1) ✓ (but this is an architectural constraint, not a physics constraint)
-   - Overall Health — bounded by sigmoid, but **no constraint that it should be a function of the three subsystem healths**
-   - Thrust — bounded by softplus (>0), but **no constraint linking it to RPM, fuel flow, and pressure ratios**
-   - TSFC — bounded by softplus (>0), but **no constraint that TSFC = FuelFlow / Thrust**
-
-4. **Where is the mass/energy balance constraint?** A real physics-informed loss would enforce:
-   $$\mathcal{L}_{energy} = \left\| \dot{m} \cdot c_p \cdot (T_3 - T_2) - \dot{m}_f \cdot LHV \cdot \eta_b \right\|^2$$
-   $$\mathcal{L}_{thrust} = \left\| F_{pred} - \dot{m}(V_e - V_0) \right\|^2$$
-   
-   None of this exists.
-
-5. **The `gamma=5.0` weight** in the training script means the penalty (which is always ~0) gets a 5× multiplier on nothing. It's a mathematical no-op.
-
----
-
-## 5. The Benchmark: Rigged to Win
-
-### [benchmark.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/evaluation/benchmark.py) — Line-by-Line Fraud
-
-This file is **the most damning evidence** in the entire repository.
-
-**Line 22:**
-```python
-df_raw, rul_target, risk_target = generate_mock_data(500)
-```
-The benchmark calls `generate_mock_data` from `train_pinn.py`, which **doesn't exist in the current version** of that file. The current `train_pinn.py` has `load_real_data()`, not `generate_mock_data()`. The benchmark script would crash if you ran it.
-
-**Line 55:**
-```python
-print("Baseline Thermodynamic Violation Rate: 42.5% (Model fails to constrain to physics)")
-```
-**THIS IS A HARDCODED STRING.** The "42.5%" is not computed. It's not measured. It's typed in. It's a literal `print()` statement pretending to be a measurement.
-
-**Line 68:**
-```python
-print("PINN Thermodynamic Violation Rate: 0.0% (Perfect Physics Consistency)")
-```
-**ALSO A HARDCODED STRING.** "0.0% — Perfect Physics Consistency" is just a `print()` statement. No calculation. No validation. No measurement. Pure fiction passed off as a benchmark result.
-
-**Line 72:**
-```python
-print("CONCLUSION: PINN dominates in Interpretability and Physics Consistency.")
-```
-The "conclusion" is also a print statement. This is not a benchmark — it's a **victory speech written before the game was played**.
-
-### The `judge.md` Uses These Invented Numbers
-
-The [judge.md](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/docs/judge.md) document presents a table showing:
-- Project Titan (XGBoost): `~5% - 25%` violation rate
-- Project Icarus (GRU): `~3% - 15%` violation rate  
-- Our PINN: `< 1.0%` violation rate
-
-These numbers are presented as "quantifiable benchmark results" from "live execution." They are not computed — they are hardcoded print statements and invented numbers. The judge document is self-authored marketing material, not an independent evaluation.
-
----
-
-## 6. The Telemetry Streamer: The Crime Scene
-
-### [telemetry_streamer.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/evaluation/telemetry_streamer.py) — Where the Magic Trick Happens
-
-**Lines 129-131:**
 ```python
 # Enforce strict thermodynamic rules on PINN output explicitly (Physics-Informed inference)
 constrained_tsfc = fuel_flow_g / thrust if thrust > 0 else 0.0
 pinn_violation = 0.0 # Mathematically perfectly constrained
 ```
 
-This is where the "physics consistency" magic happens. **After** the model predicts thrust and TSFC independently, the streamer:
+**This is the exact same cheat from the original codebase.** The model predicts a TSFC value. The streamer throws it away, hand-calculates TSFC from `fuel_flow / thrust`, sends THAT to the dashboard, and reports a violation of 0.0%.
 
-1. **Throws away the model's TSFC prediction**
-2. **Recalculates TSFC deterministically** from `fuel_flow / thrust`
-3. **Hardcodes `pinn_violation = 0.0`** — because of course, if you replace the model's output with a hand-calculated formula, the formula will be perfectly consistent with itself
-4. **Reports this hand-calculated value to the dashboard** as the PINN's prediction
-
-Meanwhile, the baselines (XGBoost and GRU) are honestly evaluated — their actual TSFC predictions are compared against the theoretical value. So the comparison is:
-
-- **Baselines:** Measured violation = `|predicted_TSFC - theoretical_TSFC| / theoretical_TSFC`
-- **PINN:** "Measured" violation = `0.0` (hardcoded, because we replaced the prediction with the theoretical value)
-
-**This is not a benchmark. This is sabotage of the baselines and fraud for the PINN.**
+The Scientific Proposal (Section 5) explicitly identified this as the corrected approach — constrain the loss, not the output. But the telemetry_streamer.py was never updated to match. The dashboard is still showing fabricated physics consistency.
 
 ### Additional Streamer Issues
 
-- **Line 94-96:** `physics_consistency = min(efficiency * 100, 100)` — The "Physics Consistency Score" displayed on the dashboard is just the raw isentropic efficiency multiplied by 100. This is not a consistency metric. If the efficiency is 0.95, the "physics score" is 95%. This number has no meaning as a quality metric.
-- The streamer sends data at 0.5s intervals but the model processes each row independently — there is no temporal context, no state accumulation, no "digital twin" behavior.
+- **Line 65:** Still loads from `turbojet_complete_dataset.csv` instead of using the proper train/test split — the streamer is streaming training data, not held-out test data
+- **Line 97:** `physics_consistency = min(efficiency * 100, 100)` — still a meaningless metric (raw efficiency × 100 ≠ physics consistency score)
+- **Lines 100-116:** The XGBoost and GRU baselines are loaded from the OLD `src/models/` directory (the ones trained on the original unsplit data), not the new ablation variants from `dist/models/`
 
----
-
-## 7. Training Pipeline: Comically Broken
-
-### [train_pinn.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/training/train_pinn.py) — The PINN Training
-
-| Problem | Detail |
-|---------|--------|
-| **No train/test split** | All 300 rows are used for training. Zero validation. Zero testing. No way to assess generalization. |
-| **10 epochs** | The model trains for exactly 10 epochs. For a 300-sample dataset, this means ~50 gradient updates total. The model has barely started learning. |
-| **No learning rate scheduling** | Constant `lr=0.001` with no decay, warmup, or scheduling |
-| **No data normalization** | The physics features (pressure ratios ~3-6, efficiency ~0.6-0.9, temperature rise ~500-1000K, normalized RPM ~2000-4000) have wildly different scales. No `StandardScaler` or normalization is applied to the PINN inputs, unlike the baselines which do use `StandardScaler`. This cripples gradient descent. |
-| **batch_size=64** on 300 samples | Only ~5 batches per epoch. Combined with 10 epochs, total training = ~50 gradient updates. |
-| **No early stopping** | No overfitting detection |
-| **No gradient clipping** | Physics penalties with `gamma=5.0` can cause gradient explosions |
-| **No checkpointing** | No best-model saving |
-| **No metrics logging** | Only prints epoch loss. No R², MAE, per-head loss breakdown |
-
-### [train_baselines.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/models/train_baselines.py) — The "Competitors"
-
-| Problem | Detail |
-|---------|--------|
-| **GRU with sequence length 1** (line 62) | `X_seq = X_scaled.reshape(X_scaled.shape[0], 1, X_scaled.shape[1])` — The GRU receives sequences of length **1**. A GRU's entire purpose is to model sequential dependencies. With seq_len=1, it's just a feed-forward network with extra overhead. This makes the GRU artificially terrible to make the PINN look good. |
-| **GRU trains for 10 epochs** | Same inadequate training |
-| **XGBoost: 50 estimators** | Reasonable, but used with `MultiOutputRegressor` which trains 6 independent models — no multi-task learning |
-| **No evaluation on any split** | Both baselines are trained and saved. No accuracy metrics are computed or reported during training. |
-
-### [train_baseline.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/training/train_baseline.py) — The "Competitor Replica"
-
-This file is a complete joke:
-- **Line 18-19:** `X = np.random.uniform(0, 1, (num_samples, 10))` and `rul = np.random.uniform(0, 100, num_samples)` — The "competitor baseline" is trained on **pure random noise**. Uniform random features with uniform random targets. This model will learn nothing. Its RMSE will be exactly what you'd expect from predicting random outputs for random inputs.
-- **Line 22-31:** The model is called `BaselineLSTM` but it's actually an MLP (3 linear layers with ReLU). The name is deliberately misleading.
-- This model is then loaded in `benchmark.py` and compared against the PINN as if it were a legitimate competitor.
-
----
-
-## 8. The "Competitor Baselines": Strawmen on Life Support
-
-The `repos/` directory contains 5 cloned GitHub repositories:
-- `DigitalTwinForAircraftMaintenance`
-- `Real-Time-Aircraft-Engine-Predictive-Maintenance-System`
-- `Real-Time-Predictive-Maintenance-System-for-Aircraft-`
-- `aircraft-engine-predictive-maintenance-system`
-- `digital-twin-for-aircraft-engine-maintenance`
-
-These were cloned for "competitive analysis" (as described in `plan.md` Section 7). However:
-
-1. **None of these repos' code is used** — the "baselines" in the project are custom-built strawmen
-2. The repos are present for optics only — to show "we studied the competition"
-3. The `integrate_notebook.py` script injects PINN code cells into someone else's Jupyter notebook (`digital-twin-for-aircraft-engine-maintenance/Deep_learning_model.ipynb`), which is academic plagiarism-adjacent
-4. The plan claims to have "conducted a massive architectural review of five leading open-source repositories" — but the code shows zero integration, zero learnings, zero actual benchmarking against them
-
----
-
-## 9. The Academic Papers: Referenced but Not Read
-
-### Paper 1: "Physics-Informed Neural Networks for Industrial Gas Turbines: Recent Trends" (PINN_Gas_Turbine_Trends_2024.pdf)
-
-- **What the paper actually discusses:** PINNs solving aerodynamic PDEs, aeromechanical phenomena, flow field reconstruction, fatigue evaluation, flutter prediction
-- **What the project claims to learn from it:** "How embedding thermodynamic equations into the loss function prevents physically impossible states"
-- **What the project actually implements:** `torch.relu(efficiency - 1.0)` — a trivial clamp, not a PDE residual
-
-### Paper 2: "Applying PIESRGAN to Finite-Rate-Chemistry Flows" (PIESRGAN_Reactive_Flows.pdf)
-
-- **What the paper actually discusses:** Super-resolution GANs for reactive flow fields in lean premixed combustion
-- **Relevance to this project:** Absolutely zero. This is about combustion CFD, not engine health monitoring. It was downloaded by the automated `download_papers.py` arXiv scraper using the query `"gas turbine" AND "physics-informed"`. The team never read it.
-
-### Paper 3: "A Data-Driven Kinematic Model of a Ducted Premixed Flame" (Data_Driven_Kinematic_Model.pdf)
-
-- **What the paper actually discusses:** Level-set solvers and ensemble Kalman filters for flame dynamics
-- **Relevance to this project:** Zero. This is about thermoacoustic oscillations in combustors, not engine health monitoring.
-
-### Paper Downloads: Automated, Not Curated
-
-The [download_papers.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/scripts/download_papers.py) script performs a **blind arXiv search** for `"gas turbine" AND "physics-informed"` and downloads the first 3 results. The papers are not selected for relevance — they're selected by an API query. The `read_pdfs.py` script reads only the **first 2 pages** (first 2000 characters) of each PDF. The "literature review" is automated scraping, not scholarship.
-
-### Papers That SHOULD Have Been Read (But Weren't)
-
-1. **Raissi, Perdikaris & Karniadakis (2019)** — "Physics-Informed Neural Networks: A Deep Learning Framework for Solving Forward and Inverse Problems Involving Nonlinear PDEs" — THE foundational PINN paper. Not cited.
-2. **N-CMAPSS technical report (Arias Chao et al., 2021)** — The actual documentation for the dataset sitting unused in `Dataset/`. Not referenced.
-3. **Li et al. (2020)** — "Remaining Useful Life Estimation in Prognostics Using Deep Convolution Neural Networks" — Standard C-MAPSS methodology. Not referenced.
-4. **Arias Chao et al. (2022)** — "Fusing physics-based and deep learning models for prognostics" — Exactly what this project claims to do. Not referenced.
-
----
-
-## 10. Deliverables Alignment: A Checklist of Failures
-
-The hackathon problem statement (Section 2, "Physics-Informed Digital Twin for Real-Time Four-Stage Turbojet Health Monitoring") specifies 6 challenge tasks and 4 deliverable categories. Let's audit compliance:
-
-### Challenge Tasks
-
-| # | Task | Required | Status | Notes |
-|---|------|----------|--------|-------|
-| 1 | Engine Digital Twin Construction | Continuously estimating operational state from sensors | ❌ **FAIL** | The model is stateless. It processes each row independently. There is no "continuously updated virtual representation." There is no state vector maintained between cycles. |
-| 2 | Subsystem Health Estimation | Compressor, Combustor, Turbine health | ⚠️ **PARTIAL** | The model has output heads for these, but trained without a proper split, no validation, and the system_architecture.md wrongly claims the data is mock. No engineering interpretability or methodology justification. |
-| 3 | Overall Engine Health Assessment | Unified health indicator | ⚠️ **PARTIAL** | Output head exists, but is an independent prediction — not derived from subsystem healths. Physically, overall health MUST be a function of subsystem healths. |
-| 4 | Surrogate Modeling | Computationally efficient approximation | ❌ **FAIL** | There is no high-fidelity model to be a "surrogate" of. A surrogate model approximates a specific simulation. This is just a regression model. The project has no reference simulation to validate against. |
-| 5 | Performance Prediction | Thrust, fuel efficiency, degradation trajectory | ⚠️ **PARTIAL** | Thrust and TSFC are predicted, but the TSFC prediction is thrown away and recalculated. No degradation trajectory prediction exists — the model has no temporal component. |
-| 6 | Uncertainty Quantification | Confidence estimates | ⚠️ **PARTIAL** | MC Dropout is implemented. But it's uncalibrated, untested, and the underlying model is trained without validation or proper splitting. |
-
-### Deliverables
-
-| Deliverable | Required | Status | Notes |
-|-------------|----------|--------|-------|
-| **Technical Report** | Methodology, feature engineering, physics integration, model architecture, validation | ❌ **FAIL** | No formal technical report. Only `system_architecture.md` (65 lines) and `judge.md` (42 lines) — both are marketing documents, not academic/technical reports. No validation methodology section. |
-| **Source Code** | Complete implementation | ⚠️ **PARTIAL** | Code exists, but doesn't use the proper train/test splits, has broken imports, and the benchmark metrics are hardcoded. |
-| **Digital Twin Dashboard** | Interactive visualization of all 7 metrics | ✅ **PASS** | The dashboard is genuinely well-built. It shows all required metrics (engine health, subsystem health, thrust, TSFC, degradation, confidence). However, the metrics feeding it are rigged. |
-| **Presentation** | Engineering rationale, methodology, results | ❌ **FAIL** | `presentation_guide.md` exists but it's a template, not a completed presentation. |
-
-### Evaluation Criteria Mapping
-
-| Criterion | Weight | Expected Score | Why |
-|-----------|--------|---------------|-----|
-| Health Estimation Accuracy | 30% | **LOW** | No train/test split, no validation, no proper metrics (R², MAE, RMSE on held-out test set). |
-| Surrogate Model Performance | 20% | **VERY LOW** | No surrogate of any reference simulation. Just a regression model. No computational cost comparison. |
-| Physics Consistency | 15% | **ZERO** | The physics consistency is faked. The benchmark metrics are hardcoded. The physics loss constrains inputs, not outputs. The TSFC is hand-calculated post-hoc. |
-| Generalization Capability | 15% | **ZERO** | No train/test split. No cross-engine generalization testing. No out-of-distribution evaluation. No evaluation on the actual test.csv. |
-| Computational Efficiency | 10% | **LOW** | No timing benchmarks. No comparison against a reference simulation. No ONNX export (mentioned in plan, never implemented). |
-| Dashboard & Interpretability | 10% | **MEDIUM** | Dashboard looks nice. But no SHAP/LIME (promised in plan, never implemented). No causal failure explanation graph (promised, never implemented). No mission replay (promised, never implemented). |
-
----
-
-## 11. Could This Be Replaced by a Simple AI-Generated Project?
-
-### Yes. Unequivocally Yes.
-
-Here's what ChatGPT/Claude could generate in 30 minutes that would produce identical or better results:
-
-1. "Build me an MLP with 6 output heads and dropout for uncertainty" → `pinn.py` (87 lines)
-2. "Compute pressure ratios and isentropic efficiency from turbojet sensor data" → `thermodynamics.py` (66 lines)
-3. "Create a loss function that penalizes efficiency > 1" → `loss.py` (45 lines)
-4. "Generate a fake turbojet dataset with 300 rows and decaying health" → The entire dataset
-5. "Build a real-time dashboard with Chart.js and Socket.io" → The dashboard
-
-**The total unique intellectual contribution of this project is approximately zero.** Every component is a textbook exercise wrapped in impressive terminology:
-
-- "ThermodynamicsEngine" = compute 5 ratios
-- "PINN" = standard MLP
-- "Physics-Informed Loss" = clip efficiency to [0,1]
-- "Grey Box" = feature engineering → black box
-- "Monte Carlo Dropout" = standard dropout + multiple forward passes (a well-known, 2015 technique)
-- "Digital Twin" = stateless regression model with a pretty dashboard
-- "Benchmark Showdown" = print statements
-
-### What Would Make It NOT Replaceable
-
-A project that could NOT be trivially generated would need:
-- Actual PDE residuals in the loss function (Navier-Stokes, energy balance)
-- A Brayton cycle simulation as the physics backbone
-- Training on the real official dataset with proper cross-engine generalization
-- Temporal modeling (LSTM/GRU/Transformer with proper sequence lengths)
-- State-space model maintaining digital twin state across cycles
-- Proper ablation studies showing the physics loss actually helps
-- Calibrated uncertainty quantification validated against ground truth
-
----
-
-## 12. The Dashboard: Pretty, But a Potemkin Village
-
-### What's Good
-
-The [index.html](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/index.html) and [app.js](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/js/app.js) are genuinely well-crafted:
-- Proper Socket.io real-time updates
-- Chart.js telemetry visualization with confidence bounds
-- Violation comparison chart between 3 models
-- Subsystem health displays
-- Operating conditions readout
-- Offline detection
-- Theme toggle
-- Tab-based navigation
-- Markdown viewer for documentation
-
-### What's Fake
-
-The dashboard **looks like it's displaying live model inference**, but:
-1. The PINN's "perfect 0.0% violation" is hardcoded in the streamer
-2. The "Physics Consistency Score" is just `min(efficiency * 100, 100)` — a meaningless number
-3. The TSFC displayed is hand-calculated, not from the model
-4. There are no actual anomaly alerts, failure diagnostics, or causal chains — just health percentages
-5. The "Mission Replay" feature mentioned in the plan does not exist
-6. The "Causal Failure Explanation Graph" mentioned in the plan does not exist
-7. SHAP/LIME integration mentioned in the plan does not exist
-
----
-
-## 13. Proposed Fixes: A Complete Rebuild Plan
-
-### Priority 0: Use the Actual Dataset (Critical, 2 hours)
-
-**Problem:** The hackathon-provided data is used without any train/test split, and the project's own docs falsely claim it's "internally generated mock data." Additionally, the existing `train.csv`/`test.csv`/`ground_truth.csv` splits are completely ignored in favor of using `turbojet_complete_dataset.csv` monolithically.
-
-**Fix:**
-```python
-# OPTION A: Use the hackathon's own structured split
-import pandas as pd
-
-train_df = pd.read_csv('Dataset/train.csv')
-test_df = pd.read_csv('Dataset/test.csv')
-ground_truth = pd.read_csv('Dataset/ground_truth.csv')
-
-# Merge train sensors with ground truth targets
-train_data = train_df.merge(ground_truth, on=['EngineID', 'Cycle'], how='inner')
-
-# OPTION B: Use turbojet_complete_dataset.csv but WITH a proper split
-from sklearn.model_selection import GroupShuffleSplit
-df = pd.read_csv('Dataset/turbojet_complete_dataset.csv')
-gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
-train_idx, test_idx = next(gss.split(df, groups=df['EngineID']))
-```
-
-Also **fix `system_architecture.md`** to correctly state the data provenance — remove the claim about it being "internally generated."
-
-**Additionally, investigate the N-CMAPSS opportunity:**
-The N-CMAPSS HDF5 file (`N-CMAPSS_DS03-012.h5`) sitting in the Dataset folder is a massive, flight-realistic turbofan degradation dataset. Before using it, validate whether its sensor schema (temperatures, pressures, RPM, flow rates, health indices) maps to the hackathon's column naming (P2/T2, P3/T3, P4/T4, etc.). If the physical measurement locations correspond, this dataset could provide **thousands** of additional training samples with realistic degradation profiles — transforming the model from a 300-sample toy to a genuinely competitive solution. Even if the parameters don't map 1:1, transfer learning or domain adaptation techniques could bridge the gap.
-
-### Priority 1: Implement Actual Physics-Informed Loss (Critical, 4 hours)
-
-**Problem:** The physics loss constrains inputs, not outputs.
-
-**Fix:** Implement loss terms that constrain the **model's outputs** to obey thermodynamic laws:
+### The Fix
 
 ```python
-class RealPhysicsInformedLoss(nn.Module):
-    def __init__(self, alpha=1.0, gamma_thrust=2.0, gamma_tsfc=2.0, gamma_health=1.0):
-        super().__init__()
-        self.alpha = alpha
-        self.gamma_thrust = gamma_thrust
-        self.gamma_tsfc = gamma_tsfc
-        self.gamma_health = gamma_health
-        self.mse = nn.MSELoss()
-    
-    def forward(self, preds, targets, raw_inputs):
-        comp_p, comb_p, turb_p, overall_p, thrust_p, tsfc_p = preds
-        comp_t, comb_t, turb_t, overall_t, thrust_t, tsfc_t = targets
-        
-        # Standard MSE loss
-        mse_total = (self.mse(comp_p.squeeze(), comp_t) + 
-                     self.mse(comb_p.squeeze(), comb_t) +
-                     self.mse(turb_p.squeeze(), turb_t) + 
-                     self.mse(overall_p.squeeze(), overall_t) +
-                     self.mse(thrust_p.squeeze(), thrust_t) + 
-                     self.mse(tsfc_p.squeeze(), tsfc_t))
-        
-        # PHYSICS CONSTRAINT 1: TSFC = FuelFlow / Thrust
-        fuel_flow = raw_inputs[:, fuel_flow_idx]  # kg/s
-        fuel_flow_g = fuel_flow * 1000  # g/s
-        theoretical_tsfc = fuel_flow_g / (thrust_p.squeeze() + 1e-6)
-        tsfc_consistency = self.mse(tsfc_p.squeeze(), theoretical_tsfc.detach())
-        
-        # PHYSICS CONSTRAINT 2: Overall health ≈ f(subsystem healths)
-        # Overall health should be a weighted combination of subsystem healths
-        expected_overall = 0.4 * comp_p.squeeze() + 0.35 * turb_p.squeeze() + 0.25 * comb_p.squeeze()
-        health_consistency = self.mse(overall_p.squeeze(), expected_overall.detach())
-        
-        # PHYSICS CONSTRAINT 3: Degradation monotonicity (within same engine)
-        # Health should generally decrease over cycles — enforce this per-engine in batch
-        
-        total = (self.alpha * mse_total + 
-                 self.gamma_tsfc * tsfc_consistency + 
-                 self.gamma_health * health_consistency)
-        
-        return total, mse_total, tsfc_consistency + health_consistency
-```
-
-### Priority 2: Fix the Thermodynamics Engine (Critical, 3 hours)
-
-**Problem:** Only 5 trivial features. No energy balance, no thrust model.
-
-**Fix:** Add the following calculations to `ThermodynamicsEngine`:
-
-```python
-def extract_physics_features(self, df):
-    df_phys = pd.DataFrame()
-    
-    # Existing features (keep)
-    df_phys['PR_comp'] = df['P2'] / df['Pamb']
-    df_phys['PR_turb'] = df['P4'] / df['P3']
-    df_phys['Comp_Isentropic_Efficiency'] = self.compute_isentropic_efficiency(
-        df['Tamb'], df['T2'], df['Pamb'], df['P2'])
-    df_phys['Combustion_Temp_Rise'] = df['T3'] - df['T2']
-    df_phys['Normalized_RPM'] = df['RPM'] / np.sqrt(df['Tamb'])
-    
-    # NEW: Turbine Isentropic Efficiency
-    pr_turb = df['P4'] / df['P3']
-    tr_turb = df['T4'] / df['T3']
-    df_phys['Turb_Isentropic_Efficiency'] = (1 - tr_turb) / (1 - np.power(pr_turb, (self.gamma - 1) / self.gamma) + 1e-6)
-    
-    # NEW: Compressor specific work (proxy)
-    cp = 1005  # J/(kg·K) for air
-    df_phys['Compressor_Work'] = cp * (df['T2'] - df['Tamb'])
-    
-    # NEW: Turbine specific work (proxy)
-    df_phys['Turbine_Work'] = cp * (df['T3'] - df['T4'])
-    
-    # NEW: Net specific work
-    df_phys['Net_Work'] = df_phys['Turbine_Work'] - df_phys['Compressor_Work']
-    
-    # NEW: Combustor heat addition
-    df_phys['Heat_Addition'] = cp * (df['T3'] - df['T2'])
-    
-    # NEW: Thermal efficiency (Brayton cycle)
-    df_phys['Thermal_Efficiency'] = df_phys['Net_Work'] / (df_phys['Heat_Addition'] + 1e-6)
-    
-    # NEW: Overall pressure ratio
-    df_phys['OPR'] = df['P3'] / df['Pamb']
-    
-    # NEW: Fuel-air ratio proxy
-    LHV = 43e6  # J/kg for kerosene
-    df_phys['FAR_proxy'] = df['Fuel_Flow'] * LHV / (cp * df['T3'] + 1e-6)
-    
-    # NEW: Corrected mass flow proxy
-    df_phys['Corrected_RPM'] = df['RPM'] * np.sqrt(288.15 / df['Tamb']) * (101325 / df['Pamb'])
-    
-    return df_phys
-```
-
-### Priority 3: Add Temporal Modeling (High, 4 hours)
-
-**Problem:** No temporal context. Each sample is processed independently.
-
-**Fix:** Use a proper sequence model:
-
-```python
-class TemporalPINN(nn.Module):
-    def __init__(self, input_dim, hidden_dim=128, num_layers=2, dropout=0.3):
-        super().__init__()
-        
-        # Physics feature processor
-        self.feature_encoder = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.LayerNorm(hidden_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-        )
-        
-        # Temporal backbone (processes sequences of cycles)
-        self.temporal = nn.GRU(
-            hidden_dim, hidden_dim, 
-            num_layers=num_layers, 
-            batch_first=True,
-            dropout=dropout
-        )
-        
-        # Health prediction heads
-        self.health_heads = nn.ModuleDict({
-            'compressor': nn.Linear(hidden_dim, 1),
-            'combustor': nn.Linear(hidden_dim, 1),
-            'turbine': nn.Linear(hidden_dim, 1),
-        })
-        
-        # Overall health derived from subsystem healths (physics-informed)
-        self.overall_combiner = nn.Linear(3, 1)
-        
-        # Performance heads
-        self.thrust_head = nn.Linear(hidden_dim, 1)
-        self.tsfc_head = nn.Linear(hidden_dim, 1)
-        
-        self.dropout = nn.Dropout(dropout)
-```
-
-### Priority 4: Fix the Benchmark (Critical, 2 hours)
-
-**Problem:** Hardcoded metrics, invented results.
-
-**Fix:** Replace all print statements with actual computations:
-
-```python
-def compute_thermodynamic_violation(pred_thrust, pred_tsfc, fuel_flow):
-    """Actually compute violation rate instead of hardcoding it."""
-    theoretical_tsfc = (fuel_flow * 1000) / (pred_thrust + 1e-6)
-    violation = torch.abs(pred_tsfc - theoretical_tsfc) / (theoretical_tsfc + 1e-6) * 100
-    return violation.mean().item()
-
-# In benchmark:
-baseline_violation = compute_thermodynamic_violation(
-    baseline_thrust_preds, baseline_tsfc_preds, fuel_flow_values)
-pinn_violation = compute_thermodynamic_violation(
-    pinn_thrust_preds, pinn_tsfc_preds, fuel_flow_values)
-
-print(f"Baseline Thermodynamic Violation Rate: {baseline_violation:.2f}%")
-print(f"PINN Thermodynamic Violation Rate: {pinn_violation:.2f}%")
-```
-
-### Priority 5: Stop Cheating in the Telemetry Streamer (Critical, 30 minutes)
-
-**Problem:** TSFC is recalculated post-hoc, violation is hardcoded.
-
-**Fix:** Use the actual model predictions:
-
-```python
-# REMOVE these lines:
-# constrained_tsfc = fuel_flow_g / thrust if thrust > 0 else 0.0
-# pinn_violation = 0.0
-
-# REPLACE with:
-pinn_violation = calc_violation(tsfc, thrust)  # Use actual model predictions
+# REMOVE lines 131-133 and REPLACE with:
+# Use the model's actual TSFC prediction
+pinn_violation = calc_violation(tsfc, thrust)  # Same function used for baselines
 
 payload = {
     # ...
-    "tsfc": tsfc,  # Use the actual PINN prediction, not the hand-calculated value
-    "pinn_violation": pinn_violation,  # Use the actual violation, not 0.0
+    "tsfc": tsfc,           # The actual model prediction, not hand-calculated
+    "pinn_violation": pinn_violation,  # The actual violation, not 0.0
 }
 ```
 
-### Priority 6: Proper Training Pipeline (High, 3 hours)
+---
 
+## 4. The Loss Function: Fixed in Spirit, Broken in Practice
+
+### What's Right
+
+The [new loss.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/models/loss.py) correctly implements two constraints on the model's **outputs**:
+1. TSFC consistency: `MSE(tsfc_pred, fuel_flow_g / thrust_pred)`
+2. Health consistency: `MSE(overall_pred, 0.40*comp + 0.35*turb + 0.25*comb)`
+
+Gradients flow through the outputs. This is structurally correct.
+
+### What's Wrong: The Scale Problem
+
+The loss sums 6 raw MSE terms:
 ```python
-from sklearn.model_selection import GroupKFold
-
-# Split by EngineID to test cross-engine generalization
-engine_ids = train_data['EngineID'].values
-gkf = GroupKFold(n_splits=5)
-
-for fold, (train_idx, val_idx) in enumerate(gkf.split(X, y, groups=engine_ids)):
-    X_train, X_val = X[train_idx], X[val_idx]
-    y_train, y_val = y[train_idx], y[val_idx]
-    
-    # Normalize using TRAIN statistics only
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_val_scaled = scaler.transform(X_val)
-    
-    # Train with early stopping
-    best_val_loss = float('inf')
-    patience_counter = 0
-    
-    for epoch in range(200):  # Not 10
-        train_loss = train_epoch(model, train_loader, optimizer, criterion)
-        val_loss = validate(model, val_loader, criterion)
-        
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            torch.save(model.state_dict(), f'best_model_fold{fold}.pth')
-            patience_counter = 0
-        else:
-            patience_counter += 1
-            if patience_counter >= 20:
-                break
+mse_total = (MSE(comp, comp_t) + MSE(comb, comb_t) + MSE(turb, turb_t) + 
+             MSE(overall, overall_t) + MSE(thrust, thrust_t) + MSE(tsfc, tsfc_t))
 ```
 
-### Priority 7: Implement Promised but Missing Features (Medium, 4+ hours)
+But the targets have wildly different scales:
+| Output | Range | Typical squared error |
+|--------|-------|--------------------|
+| CompressorHealth | 0.85–1.0 | ~0.001 |
+| CombustorHealth | 0.85–1.0 | ~0.001 |
+| TurbineHealth | 0.85–1.0 | ~0.001 |
+| OverallHealth | 0.85–1.0 | ~0.001 |
+| **Thrust_N** | **20,000–60,000** | **~625,000,000** |
+| TSFC_g_N_s | 0.01–0.1 | ~0.001 |
 
-1. **SHAP/LIME Explainability** — Promised in `plan.md`, never implemented
-   ```python
-   import shap
-   explainer = shap.DeepExplainer(model, background_data)
-   shap_values = explainer.shap_values(test_data)
-   ```
+**Thrust dominates the loss by a factor of ~10⁹.** The health heads receive essentially zero gradient. The TSFC head receives essentially zero gradient. This is why:
+- All three models give the same RMSE=0.0879 for health (the health heads barely update)
+- TSFC violation is 100% (the TSFC head barely updates)
+- The model only learns thrust (poorly, given the magnitude)
 
-2. **Causal Failure Graph** — Promised, never implemented. Need a rule-based system:
-   ```python
-   def diagnose_fault(features, predictions):
-       if features['PR_comp'] < threshold and features['Comp_Efficiency'] < threshold:
-           return "Compressor Fouling: Pressure ratio drop with efficiency loss"
-       if features['T4'] > threshold and predictions['turb_health'] < 0.7:
-           return "Turbine Erosion: Exit temperature rise with health degradation"
-   ```
+### The Fix: Normalize Targets or Use Per-Head Weighting
 
-3. **Mission Replay Slider** — Promised, never implemented. Need to store telemetry history and add a time slider to the dashboard.
+```python
+# Option 1: Normalize targets (preferred)
+# Scale Thrust_N to [0,1] range before training using the same StandardScaler approach
+# This ensures all 6 heads contribute equally to the gradient
 
-4. **ONNX Export** — Mentioned in plan, never implemented:
-   ```python
-   import torch.onnx
-   torch.onnx.export(model, dummy_input, "model.onnx")
-   ```
+# Option 2: Per-head loss weighting
+mse_total = (self.mse(comp_p.squeeze(), comp_t) + 
+             self.mse(comb_p.squeeze(), comb_t) +
+             self.mse(turb_p.squeeze(), turb_t) +
+             self.mse(overall_p.squeeze(), overall_t) +
+             self.mse(thrust_p.squeeze(), thrust_t) / (thrust_scale**2) +  # Normalize by target variance
+             self.mse(tsfc_p.squeeze(), tsfc_t) * tsfc_weight)
+```
 
-### Priority 8: Write a Real Technical Report (High, 4 hours)
-
-The current documentation (`system_architecture.md`, `judge.md`) reads like marketing copy, not an engineering report. A proper report needs:
-
-1. **Problem Formulation** — Mathematical statement of the estimation problem
-2. **Methodology** — With equations, not buzzwords
-3. **Feature Engineering** — Derivation of each physics feature with units and validity ranges
-4. **Model Architecture** — Layer dimensions, activation functions, hyperparameter selection rationale
-5. **Training Protocol** — Data splits, normalization, learning rate schedule, convergence criteria
-6. **Validation** — R², RMSE, MAE per output, per engine, cross-validated
-7. **Ablation Study** — Model performance WITH and WITHOUT the physics loss, to prove it actually helps
-8. **Physics Consistency Analysis** — Actual thermodynamic violation rates computed, not printed
-9. **Uncertainty Calibration** — Reliability diagrams showing MC Dropout coverage
-10. **Limitations** — Honest discussion of what doesn't work
+The Scientific Proposal missed this entirely. It focused on the structural correctness of the loss (constraining outputs vs. inputs) but never addressed the scale mismatch — the single biggest reason the model isn't learning.
 
 ---
 
-## FINAL VERDICT
+## 5. The Dataset Split: Good Idea, Problematic Implementation
 
-### Score Card
+### What's Right
 
-| Aspect | Score (1-10) | Comment |
-|--------|-------------|---------|
-| **Dataset Integrity** | 2/10 | Hackathon data used without split; own docs falsely claim it's mock; N-CMAPSS untouched |
-| **Physics Integration** | 2/10 | 5 trivial ratios ≠ physics-informed ML |
-| **Model Architecture** | 3/10 | Standard MLP with nothing novel |
-| **Training Rigor** | 1/10 | 10 epochs, no validation, no normalization |
-| **Benchmark Honesty** | 0/10 | Hardcoded results, rigged comparisons |
-| **Paper Alignment** | 1/10 | Papers downloaded by bot, never read or implemented |
-| **Deliverables Coverage** | 3/10 | Dashboard exists, everything else is partial or missing |
-| **Code Quality** | 4/10 | Functional Python, but broken imports and dead code |
-| **Innovation** | 2/10 | Nothing that couldn't be generated by an AI in 30 minutes |
-| **Dashboard** | 7/10 | Genuinely well-designed UI. Only bright spot. |
-| **OVERALL** | **2.4/10** | |
+[dataset.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/data_pipeline/dataset.py) and [train.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/training/train.py) implement:
+- Engine-based splits: Train (engines not in {7,8,9,10}), Val (engines 7,8), Test (engines 9,10)
+- Scaler fitted on train only
+- Test engines never seen during training
+- Results: Train=180, Val=60, Test=60
 
-### The One-Sentence Verdict
+### What's Wrong
 
-> **This project is a well-produced theater production where the actors are performing a play called "Physics-Informed Neural Network" while actually performing standard regression on unsplit data with hardcoded benchmark results — all wrapped in a genuinely impressive dashboard that serves as the world's most beautiful lie detector.**
+**Line 27 of dataset.py:**
+```python
+df_all_sensors = pd.concat([df_train, df_test], ignore_index=True).drop_duplicates(subset=['EngineID', 'Cycle'])
+```
 
-### Can It Win?
+This **concatenates train.csv and test.csv** into a single pool, then re-splits by EngineID. This means:
+1. The hackathon's own intended split (train.csv vs test.csv) is destroyed
+2. The split is now entirely determined by `test_engines=[9, 10]` in `get_engine_split()`
+3. If the hackathon intended specific engines in train vs test (which the Scientific Proposal's own analysis suggests), this ignores that intent
 
-No. Any judge who asks:
-1. "Show me your model's performance on the official test set" → Project fails (never trained on it)
-2. "Walk me through your physics loss function" → "We penalize input features" → Game over
-3. "How do you ensure TSFC consistency?" → "We recalculate it after inference" → Disqualified
-4. "Show me your ablation: model WITH vs WITHOUT physics loss" → Doesn't exist
-5. "What's your cross-engine generalization accuracy?" → Doesn't exist
+The Scientific Proposal (Section 1) explicitly noted that `train.csv` and `test.csv` contain different EngineIDs and recommended using them as-is. The implementation contradicts its own proposal by re-pooling them.
 
-### Is It Salvageable?
+### Additional Issue: GroupKFold is imported but never used
 
-**Yes, but it requires a near-complete rebuild of the backend.** The dashboard and frontend are excellent. The project structure is reasonable. The idea is sound. But every single Python file needs to be rewritten with:
-1. The actual official dataset
-2. Real physics constraints in the loss function
-3. Honest benchmarking
-4. Proper ML training practices
-5. Temporal modeling for degradation trajectories
-6. Implementation of all promised features
-
-The team clearly has strong frontend skills and a solid understanding of what the *architecture should look like* on paper. The problem is that the implementation is a facade — the backend is Potemkin code that looks correct at a distance but collapses under any scrutiny.
+[dataset.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/data_pipeline/dataset.py#L6) line 6:
+```python
+from sklearn.model_selection import GroupKFold
+```
+This import is unused — the Scientific Proposal recommended optional GroupKFold for hyperparameter tuning within training, but it was never implemented.
 
 ---
 
-*"Zero and Already Behind" — the project name turned out to be prophetically accurate.*
+## 6. The ThermodynamicsEngine: Better, But Still Incomplete
+
+### What Was Added
+
+[thermodynamics.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/data_pipeline/thermodynamics.py) now computes 11 features (up from 5):
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| PR_comp | ✅ Kept | |
+| PR_turb | ✅ Kept | |
+| Comp_Isentropic_Efficiency | ✅ Kept | |
+| Combustion_Temp_Rise | ✅ Kept | |
+| Normalized_RPM | ✅ Kept | |
+| **Turb_Isentropic_Efficiency** | ✅ **NEW** | (1 - T4/T3) / (1 - (P4/P3)^0.2857) — directly from the Scientific Proposal |
+| **Compressor_Specific_Work** | ✅ **NEW** | cp × (T2 - Tamb) |
+| **Turbine_Specific_Work** | ✅ **NEW** | cp × (T3 - T4) |
+| **Net_Specific_Work** | ✅ **NEW** | Turb - Comp specific work |
+| **Combustor_Heat_Addition** | ✅ **NEW** | cp × (T3 - T2) |
+| **Overall_Pressure_Ratio** | ✅ **NEW** | P3 / Pamb |
+
+### What's Still Missing
+
+The Scientific Proposal (Section 4) explicitly recommended adding `Fuel-Flow-Normalized Work = Net_Specific_Work / Fuel_Flow`:
+
+> "Finally uses Fuel_Flow in the physics layer — a genuine efficiency-like indicator"
+
+This feature — the one the Proposal called the most important addition because it finally uses the Fuel_Flow column — **was not implemented.** The physics layer still does not use the Fuel_Flow column.
+
+### Additional Concern: Redundant Features
+
+`Combustion_Temp_Rise = T3 - T2` and `Combustor_Heat_Addition = cp × (T3 - T2)` are linearly related (differ by a constant factor of 1005). The Scientific Proposal itself flagged this:
+
+> "Same as Combustion_Temp_Rise scaled by cp — keep both only if you show they're used differently downstream"
+
+Both are kept. Since `StandardScaler` normalizes them, they become numerically identical inputs — one should be removed to avoid wasting capacity in the 32-wide hidden layer.
+
+---
+
+## 7. The Model Architecture: Undersized for the Problem
+
+### The Change
+
+`hidden_dim` was reduced from 128 to 32 per the Scientific Proposal's recommendation. With 3 shared layers of width 32 and 6 output heads, the model has **~2,700 parameters** (from ~145K before).
+
+### The Concern
+
+32 neurons × 3 layers is very tight for a model that must simultaneously learn:
+- 3 subsystem health trajectories (compressor, combustor, turbine)
+- 1 composite overall health
+- Thrust (a highly nonlinear function of RPM, fuel flow, pressure ratios, temperature)
+- TSFC (a ratio of fuel flow to thrust)
+
+With 11 physics features as input and 6 multi-scale outputs, the representational capacity may be insufficient. The training curves show losses still declining after 300 epochs with no early stopping triggered — this is consistent with an underfitting model that needs more capacity, not less.
+
+### Recommendation
+
+Try `hidden_dim=64` as a middle ground. The Scientific Proposal recommended "32–64" — the implementation went with the lower bound. Given that the model isn't converging, the upper bound is worth testing. The `weight_decay=1e-4` is appropriate regularization to prevent overfitting at N=300.
+
+---
+
+## 8. The Benchmark: Honest Now, But Revealing Failure
+
+### What's Good
+
+[benchmark.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/evaluation/benchmark.py) is now scientifically sound:
+- All metrics computed from actual model predictions
+- TSFC violation computed correctly: `|tsfc_pred - fuel_flow/thrust_pred| / (fuel_flow/thrust_pred) × 100`
+- MC-Dropout calibration coverage computed against held-out test engines
+- Surrogate speed measured with warmup and real timing
+- Results saved to JSON for dashboard consumption
+
+### What's Revealed
+
+The honest benchmark exposes that the model isn't working:
+
+| Metric | Result | What It Means |
+|--------|--------|--------------|
+| TSFC violation | ~100% all variants | The model has not learned the TSFC relationship at all — predictions bear no resemblance to `FuelFlow/Thrust` |
+| Overall RMSE | 0.0879 (identical) | Physics features and constraints make zero difference; suggests health heads aren't receiving gradient |
+| MC-Dropout coverage | 0.0% | The model is maximally overconfident — uncertainty bands are far too narrow to capture any true values |
+| Surrogate speedup | 935.7× | This number is legitimate and impressive — the only positive result |
+
+### The Speedup Is Real, But Misleading
+
+The 935.7× speedup is real: batched GPU/CPU tensor inference is dramatically faster than Python-loop pandas operations per row. But note the comparison:
+- **Slow path:** Python `for i in range(N): df.iloc[[i]]` — this is a slow Python loop with pandas indexing overhead. A vectorized `thermo_engine.extract_physics_features(df)` call on the full dataframe would be much faster.
+- **Fast path:** Single batched `model(X_tensor)` — this is inherently faster regardless of model quality.
+
+The speedup measures "Python loop vs. batched tensor ops," not "high-fidelity simulation vs. surrogate." The Scientific Proposal's Section 11 acknowledged this by calling it the "slow path" proxy, which is defensible — but the 935× number overstates the real speedup a turbojet operator would care about. A more honest framing: "0.003 ms per sample enables real-time inference at rates far exceeding typical 1–10 Hz sensor sampling rates."
+
+---
+
+## 9. Missing Deliverables: Dashboard Rebuild Not Started
+
+The `DASHBOARD_BUILD_GUIDE.md` is excellent — detailed, aviation-grounded, and specific about every panel. But **none of it has been implemented.** The dashboard (index.html, js/app.js) is still the original version from before the roast:
+
+| Required Panel | Status |
+|---------------|--------|
+| Engine operating conditions (raw telemetry) | ❌ Not implemented |
+| Predicted thrust (own panel) | ❌ Not implemented |
+| 4-stage engine schematic (signature element) | ❌ Not implemented |
+| Per-engine trajectory view | ❌ Not implemented |
+| Calibration panel (MC-Dropout coverage) | ❌ Not implemented |
+| Ablation result panel | ❌ Not implemented |
+| Surrogate speed panel | ❌ Not implemented |
+| Explainability panel | ❌ Not implemented |
+| Model Card | ❌ Not implemented |
+| Aviation design token system | ❌ Not implemented |
+
+The `DASHBOARD_BUILD_GUIDE.md` is a build specification, not a build. The dashboard is still the old SaaS-styled version displaying rigged telemetry from the unreformed streamer.
+
+---
+
+## 10. Remaining Critical Fixes
+
+Ordered by impact on the benchmark numbers, which is what matters for the competition:
+
+### Fix 1: TARGET NORMALIZATION (Critical — this is why nothing works)
+
+**The single most important fix.** Without this, all other improvements are wasted.
+
+```python
+# In dataset.py, normalize targets the same way you normalize features:
+target_cols = ['CompressorHealth', 'CombustorHealth', 'TurbineHealth', 
+               'OverallHealth', 'Thrust_N', 'TSFC_g_N_s']
+
+target_scaler = StandardScaler()
+y_train_scaled = target_scaler.fit_transform(y_train_raw)
+y_val_scaled = target_scaler.transform(y_val_raw)
+
+# During inference, inverse-transform predictions:
+# preds_original_scale = target_scaler.inverse_transform(preds_scaled)
+```
+
+Alternatively, normalize per-head: divide Thrust by its training-set mean/std, divide health values by theirs, so all 6 heads contribute roughly equally to the gradient.
+
+**The sigmoid/softplus output activations also need rethinking:** 
+- Sigmoid clamps health to [0,1], which is correct in principle but means the model can't predict normalized target values outside [0,1] — if you normalize targets, remove sigmoid
+- Softplus guarantees positive thrust/TSFC, but at normalized scale these might need to be negative (below-mean predictions) — remove softplus if normalizing
+
+The cleanest approach: **normalize targets, remove all output activations, let the heads predict freely, and de-normalize at inference time.**
+
+### Fix 2: STOP CHEATING IN THE TELEMETRY STREAMER (Critical)
+
+Lines 131–133 of [telemetry_streamer.py](file:///c:/Users/anant/Downloads/zero%20and%20already%20behind/src/evaluation/telemetry_streamer.py#L131-L133):
+
+```python
+# DELETE THESE:
+constrained_tsfc = fuel_flow_g / thrust if thrust > 0 else 0.0
+pinn_violation = 0.0
+
+# REPLACE WITH:
+pinn_violation = calc_violation(tsfc, thrust)
+# And in the payload, use `tsfc` not `constrained_tsfc`
+```
+
+Also fix line 65: stream from the test split, not `turbojet_complete_dataset.csv`.
+
+### Fix 3: ADD FUEL-FLOW-NORMALIZED WORK FEATURE (High)
+
+The Scientific Proposal explicitly recommended this as the key missing feature. Add to thermodynamics.py:
+
+```python
+if all(col in df.columns for col in ['Fuel_Flow']) and 'Net_Specific_Work' in df_phys.columns:
+    df_phys['Fuel_Flow_Norm_Work'] = df_phys['Net_Specific_Work'] / (df['Fuel_Flow'].values + 1e-6)
+```
+
+### Fix 4: REMOVE REDUNDANT FEATURE (Low)
+
+Drop either `Combustion_Temp_Rise` or `Combustor_Heat_Addition` — they're linearly identical after scaling.
+
+### Fix 5: TRY hidden_dim=64 (Medium)
+
+The model may be underfitting at 32. The training curves never triggered early stopping, consistent with insufficient capacity.
+
+### Fix 6: IMPLEMENT THE DASHBOARD (High — required deliverable)
+
+The `DASHBOARD_BUILD_GUIDE.md` is ready to be handed to a coding agent. The `benchmark_results.json` is already being written. Wire up the dashboard to consume it.
+
+### Fix 7: USE THE HACKATHON'S OWN SPLIT (Medium)
+
+Instead of re-pooling train.csv + test.csv and making your own engine split, use `train.csv` engines for training and `test.csv` engines for testing, as the organizers presumably intended. Verify with:
+
+```python
+train_engines = set(pd.read_csv('Dataset/train.csv')['EngineID'].unique())
+test_engines = set(pd.read_csv('Dataset/test.csv')['EngineID'].unique())
+print(f"Overlap: {train_engines & test_engines}")  # Should be empty
+```
+
+### Fix 8: FIX THE system_architecture.md (Quick)
+
+The doc still falsely claims the dataset is "internally generated mock data." This must be corrected before any presentation — it's the first thing a judge reviewing the docs would see.
+
+---
+
+## 11. Revised Verdict & Scorecard
+
+### Score Card — Revision 2
+
+| Aspect | Rev 1 | Rev 2 | Comment |
+|--------|-------|-------|---------|
+| **Dataset Integrity** | 2/10 | 5/10 | Proper engine-level split exists, but re-pools CSVs instead of using the hackathon's own split; old docs still uncorrected |
+| **Physics Integration** | 2/10 | 5/10 | Loss constrains outputs (correct), 11 features (up from 5), but Fuel_Flow still not used, and the constraints have zero measured effect |
+| **Model Architecture** | 3/10 | 4/10 | Right-sized but possibly underfitting; no temporal modeling; multi-head scale imbalance is unaddressed |
+| **Training Rigor** | 1/10 | 6/10 | 300 epochs, early stopping, weight decay, engine-based split — major improvement. But target normalization is missing, which sabotages everything |
+| **Benchmark Honesty** | 0/10 | 8/10 | All metrics now computed from real predictions. Surrogate speed measured. MC-Dropout coverage measured. Results saved to JSON. Only deduction: the streamer still cheats separately |
+| **Paper Alignment** | 1/10 | 6/10 | Scientific Proposal grounds terminology correctly (PCMN not PINN), cites Raissi et al. for distinction, correct citations. But implementation doesn't fully follow the proposal |
+| **Deliverables Coverage** | 3/10 | 3/10 | No change — dashboard is still the old version, no new panels implemented |
+| **Code Quality** | 4/10 | 7/10 | Clean modular structure (dataset.py, train.py, loss.py, benchmark.py). Proper imports. Scripts actually run. Ablation variants are cleanly parameterized |
+| **Innovation** | 2/10 | 4/10 | The ablation framework + honest benchmarking is uncommon in hackathon projects. The grey-box framing is correctly positioned. But no novel technique beyond textbook approaches |
+| **Dashboard** | 7/10 | 4/10 | Score drops because the dashboard guide is excellent but unimplemented, and the old dashboard is still showing fabricated data from the cheating streamer |
+| **OVERALL** | **2.4/10** | **5.2/10** | |
+
+### The Trajectory
+
+The project has moved from **"theatre"** to **"an honest attempt that doesn't work yet."** That's a real and meaningful improvement — honesty is the foundation everything else is built on.
+
+The path from 5/10 to 7/10 requires exactly two things:
+1. **Fix the target normalization** so the model actually trains (Fix 1 above)
+2. **Implement the dashboard** using the already-written build guide
+
+The path from 7/10 to 8+/10 requires:
+3. **Remove the streamer cheat** (Fix 2)
+4. **Show that the ablation produces different numbers** — i.e., that the Full Model actually outperforms Baseline-Raw on TSFC violation and health RMSE
+5. **Fix the system_architecture.md** provenance claim
+
+### Can It Win Now?
+
+**Not yet, but it could.** The structural honesty is there. The ablation framework is there. The benchmark infrastructure is there. What's missing is a model that actually works — and that's a target normalization fix away from being testable. If the Full Model's TSFC violation drops to, say, <5% while Baseline-Raw stays at 100%, you have a genuinely compelling and defensible result that most hackathon teams will never produce.
+
+### The One-Sentence Verdict (Revised)
+
+> **Revision 2 converted a Potemkin project into an honest-but-broken one: the infrastructure is real, the benchmarking is real, the ablation framework is real — but the model can't learn because thrust losses dwarf everything else, the telemetry streamer is still faking results, and the dashboard rebuild exists only as a specification, not an implementation.**
+
+---
+
+*"Zero and Already Behind" — still behind, but at least now running in the right direction.*

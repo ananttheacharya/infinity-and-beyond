@@ -11,19 +11,8 @@ import torch.nn as nn
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from src.data_pipeline.thermodynamics import ThermodynamicsEngine
-from src.models.pinn import PINNDigitalTwin
-
-class GRUBaseline(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim):
-        super(GRUBaseline, self).__init__()
-        self.gru = nn.GRU(input_dim, hidden_dim, num_layers=2, batch_first=True)
-        self.fc = nn.Linear(hidden_dim, output_dim)
-        
-    def forward(self, x):
-        out, _ = self.gru(x)
-        out = self.fc(out[:, -1, :])
-        return out
-
+from src.models.pinn import DigitalTwinModel
+from src.models.pinn import DigitalTwinModel
 
 def stream_telemetry():
     print("Starting LIVE Physics-Informed Digital Twin Telemetry Streamer...")
@@ -32,31 +21,39 @@ def stream_telemetry():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device for inference: {device}")
     
-    # 1. Load the Model
+    thermo = ThermodynamicsEngine()
+    
+    # Determine input dims
+    df_dummy = pd.DataFrame({'Tamb': [288], 'Pamb': [101325], 'T2': [350], 'P2': [150000], 'T3': [900], 'P3': [900000], 'T4': [700], 'P4': [400000], 'RPM': [9000], 'Fuel_Flow': [1.0], 'Altitude_m': [0], 'Mach': [0]})
+    phys_input_dim = thermo.extract_physics_features(df_dummy).shape[1]
+    raw_input_dim = 12 # sensor cols
+    
+    # 1. Load the Models
     try:
-        # Determine input dim by running a dummy sample through ThermodynamicsEngine
-        thermo = ThermodynamicsEngine()
-        df_dummy = pd.DataFrame({'Tamb': [288], 'Pamb': [101325], 'T2': [350], 'P2': [150000], 'T3': [900], 'P3': [900000], 'T4': [700], 'P4': [400000], 'RPM': [9000], 'Fuel_Flow': [1.0]})
-        input_dim = thermo.extract_physics_features(df_dummy).shape[1]
+        # Full Model
+        full_model = DigitalTwinModel(input_dim=phys_input_dim, hidden_dim=32, dropout_rate=0.1).to(device)
+        full_model.load_state_dict(torch.load('dist/models/full_model.pth', map_location=device, weights_only=True))
+        full_model.eval()
+        full_scaler = joblib.load('dist/models/full_model_scaler.joblib')
+        full_target_scaler = joblib.load('dist/models/full_model_target_scaler.joblib')
         
-        model = PINNDigitalTwin(input_dim=input_dim, hidden_dim=128).to(device)
-        model.load_state_dict(torch.load('dist/models/pinn_model.pth', map_location=device))
-        model.eval()
-        print("Successfully loaded PINN model weights.")
+        # Baseline-PhysFeat
+        phys_model = DigitalTwinModel(input_dim=phys_input_dim, hidden_dim=32, dropout_rate=0.1).to(device)
+        phys_model.load_state_dict(torch.load('dist/models/baseline-physfeat.pth', map_location=device, weights_only=True))
+        phys_model.eval()
+        phys_scaler = joblib.load('dist/models/baseline-physfeat_scaler.joblib')
+        phys_target_scaler = joblib.load('dist/models/baseline-physfeat_target_scaler.joblib')
         
-        # Load Baselines
-        print("Loading baseline models...")
-        xgb_model = joblib.load('src/models/xgboost_titan.joblib')
-        xgb_scaler = joblib.load('src/models/xgb_scaler.joblib')
+        # Baseline-Raw
+        raw_model = DigitalTwinModel(input_dim=raw_input_dim, hidden_dim=32, dropout_rate=0.1).to(device)
+        raw_model.load_state_dict(torch.load('dist/models/baseline-raw.pth', map_location=device, weights_only=True))
+        raw_model.eval()
+        raw_scaler = joblib.load('dist/models/baseline-raw_scaler.joblib')
+        raw_target_scaler = joblib.load('dist/models/baseline-raw_target_scaler.joblib')
         
-        gru_scaler = joblib.load('src/models/gru_scaler.joblib')
-        gru_model = GRUBaseline(12, 64, 6).to(device) # 12 inputs, 6 outputs
-        gru_model.load_state_dict(torch.load('src/models/gru_icarus.pt', map_location=device))
-        gru_model.eval()
-        print("Baseline models loaded.")
-        
+        print("Successfully loaded all models and scalers.")
     except Exception as e:
-        print(f"Error loading model: {e}. Did you run orchestrator.py and train_baselines.py?")
+        print(f"Error loading models: {e}. Did you run train.py?")
         return
 
     # 2. Load Real Dataset to stream
@@ -73,62 +70,60 @@ def stream_telemetry():
 
     print("Initiating Live Stream...")
     
-    # We will loop through the dataset simulating a live feed
+    # Loop through dataset simulating live feed
     for idx, row in df_raw.iterrows():
-        # Prepare input
         row_df = pd.DataFrame([row])
-        features = thermo.extract_physics_features(row_df)
-        x_tensor = torch.tensor(features.values, dtype=torch.float32).to(device)
-        
-        # Inference with Uncertainty (MC Dropout)
-        predictions = model.predict_with_uncertainty(x_tensor, num_samples=10)
-        
-        comp_h, comp_std = predictions[0][0].item(), predictions[0][1].item()
-        comb_h, comb_std = predictions[1][0].item(), predictions[1][1].item()
-        turb_h, turb_std = predictions[2][0].item(), predictions[2][1].item()
-        overall_h, overall_std = predictions[3][0].item(), predictions[3][1].item()
-        thrust, thrust_std = predictions[4][0].item(), predictions[4][1].item()
-        tsfc, tsfc_std = predictions[5][0].item(), predictions[5][1].item()
-        
-        # Calculate Physics Consistency (e.g. Isentropic Efficiency)
-        efficiency = features['Comp_Isentropic_Efficiency'].values[0]
-        physics_consistency = min(efficiency * 100, 100)
-        physics_score = f"{physics_consistency:.1f}%" # Bound to 100% for display
-        
-        # Baseline inputs: raw sensor data
-        INPUT_COLS = ['Altitude_m', 'Mach', 'Tamb', 'Pamb', 'RPM', 'Fuel_Flow', 
-                      'P2', 'T2', 'P3', 'T3', 'P4', 'T4']
-        raw_x = row_df[INPUT_COLS].values
-        
-        # XGBoost Inference (Titan)
-        xgb_x_scaled = xgb_scaler.transform(raw_x)
-        xgb_preds = xgb_model.predict(xgb_x_scaled)[0]
-        xgb_thrust, xgb_tsfc = xgb_preds[4], xgb_preds[5]
-        
-        # GRU Inference (Icarus)
-        gru_x_scaled = gru_scaler.transform(raw_x)
-        gru_x_seq = gru_x_scaled.reshape(1, 1, len(INPUT_COLS))
-        gru_tensor = torch.tensor(gru_x_seq, dtype=torch.float32).to(device)
-        with torch.no_grad():
-            gru_preds = gru_model(gru_tensor).cpu().numpy()[0]
-        gru_thrust, gru_tsfc = gru_preds[4], gru_preds[5]
-        
-        # Calculate Real Thermodynamic Violations for Showdown
-        # Physics Constraint: TSFC = (FuelFlow_kg_s * 1000) / Thrust
         fuel_flow_g = row['Fuel_Flow'] * 1000.0
         
-        def calc_violation(pred_tsfc, pred_thrust):
-            if pred_thrust <= 0: return 100.0
-            theo_tsfc = fuel_flow_g / pred_thrust
-            return min(abs(pred_tsfc - theo_tsfc) / theo_tsfc * 100.0, 100.0)
-
-        # Quantifiable Live Readings
-        icarus_violation = calc_violation(gru_tsfc, gru_thrust)
-        titan_violation = calc_violation(xgb_tsfc, xgb_thrust)
+        # --- PREPARE INPUTS ---
+        phys_features = thermo.extract_physics_features(row_df)
+        raw_sensor_cols = ['Tamb', 'Pamb', 'T2', 'P2', 'T3', 'P3', 'T4', 'P4', 'RPM', 'Fuel_Flow', 'Altitude_m', 'Mach']
+        raw_features = row_df[raw_sensor_cols]
         
-        # Enforce strict thermodynamic rules on PINN output explicitly (Physics-Informed inference)
-        constrained_tsfc = fuel_flow_g / thrust if thrust > 0 else 0.0
-        pinn_violation = 0.0 # Mathematically perfectly constrained
+        full_x = torch.tensor(full_scaler.transform(phys_features.values), dtype=torch.float32).to(device)
+        phys_x = torch.tensor(phys_scaler.transform(phys_features.values), dtype=torch.float32).to(device)
+        raw_x = torch.tensor(raw_scaler.transform(raw_features.values), dtype=torch.float32).to(device)
+        
+        # --- INFERENCE ---
+        with torch.no_grad():
+            # Full Model (with uncertainty)
+            full_stats = full_model.predict_with_uncertainty(full_x, num_samples=10)
+            
+            # Baseline-PhysFeat
+            phys_preds = phys_model(phys_x)
+            
+            # Baseline-Raw
+            raw_preds = raw_model(raw_x)
+            
+        # --- DENORMALIZE ---
+        # Full Model
+        comp_h = full_stats[0][0].item() * full_target_scaler.scale_[0] + full_target_scaler.mean_[0]
+        comb_h = full_stats[1][0].item() * full_target_scaler.scale_[1] + full_target_scaler.mean_[1]
+        turb_h = full_stats[2][0].item() * full_target_scaler.scale_[2] + full_target_scaler.mean_[2]
+        overall_h = full_stats[3][0].item() * full_target_scaler.scale_[3] + full_target_scaler.mean_[3]
+        overall_std = full_stats[3][1].item() * full_target_scaler.scale_[3]
+        thrust = full_stats[4][0].item() * full_target_scaler.scale_[4] + full_target_scaler.mean_[4]
+        
+        # Deterministic TSFC
+        tsfc = fuel_flow_g / (thrust + 1e-6)
+        
+        # Baseline-PhysFeat
+        phys_thrust = phys_preds[4].item() * phys_target_scaler.scale_[4] + phys_target_scaler.mean_[4]
+        phys_tsfc = fuel_flow_g / (phys_thrust + 1e-6)
+        
+        # Baseline-Raw
+        raw_thrust = raw_preds[4].item() * raw_target_scaler.scale_[4] + raw_target_scaler.mean_[4]
+        raw_tsfc = fuel_flow_g / (raw_thrust + 1e-6)
+        
+        # --- METRICS ---
+        efficiency = phys_features['Comp_Isentropic_Efficiency'].values[0]
+        physics_consistency = min(efficiency * 100, 100)
+        physics_score = f"{physics_consistency:.1f}%"
+        
+        # TSFC violation is 0.0% by construction now. We can still send 0.0
+        pinn_violation = 0.0
+        phys_violation = 0.0
+        raw_violation = 0.0
         
         payload = {
             "cycle": row['Cycle'],
@@ -137,12 +132,12 @@ def stream_telemetry():
             "turb_health": turb_h * 100,
             "overall_health": overall_h * 100,
             "thrust": thrust,
-            "tsfc": constrained_tsfc,
+            "tsfc": tsfc, # Sending deterministic TSFC
             "uncertainty_overall": overall_std * 100,
             "physics_score": physics_score,
             "pinn_violation": pinn_violation,
-            "icarus_violation": icarus_violation,
-            "titan_violation": titan_violation,
+            "icarus_violation": phys_violation, # Reusing field for PhysFeat
+            "titan_violation": raw_violation,   # Reusing field for Raw
             "op_altitude": row['Altitude_m'],
             "op_mach": row['Mach'],
             "op_tamb": row['Tamb'],
@@ -154,14 +149,13 @@ def stream_telemetry():
         try:
             response = requests.post(url, json=payload)
             if response.status_code == 200:
-                print(f"Cycle {row['Cycle']} | Overall: {overall_h*100:.1f}% | Thrust: {thrust:.0f}N | Physics: {physics_score}")
+                print(f"Cycle {row['Cycle']} | Health: {overall_h*100:.1f}% | TSFC: Structurally enforced (Δthrust-driven)")
         except requests.exceptions.RequestException as e:
-            # Catch all network/timeout/protocol errors so the streamer doesn't crash on NaN or disconnects
-            print(f"Network Warning: Could not push telemetry to Dashboard. Waiting for reconnection... ({type(e).__name__})")
+            print(f"Network Warning: Could not push telemetry to Dashboard. ({type(e).__name__})")
             time.sleep(2)
             continue
             
-        time.sleep(0.5) # 2 updates per second
+        time.sleep(0.5)
 
     print("Engine Run Complete.")
 

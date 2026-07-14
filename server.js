@@ -13,8 +13,8 @@ const io = new Server(httpServer, {
   cors: { origin: '*' }
 });
 
-// Serve the static files from the Vite build
-app.use(express.static(path.join(__dirname, 'dist')));
+// Serve the static files from the public folder
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json()); // Enable JSON parsing for incoming telemetry
 
 // In-memory state for tasks
