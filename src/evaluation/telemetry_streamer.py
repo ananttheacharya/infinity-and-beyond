@@ -4,6 +4,7 @@ import sys
 import os
 import torch
 import pandas as pd
+import numpy as np
 import joblib
 import torch.nn as nn
 
@@ -195,7 +196,7 @@ def stream_telemetry():
         try:
             response = requests.post(url, json=payload)
             if response.status_code == 200:
-                print(f"Cycle {row['Cycle']} | Health: {overall_h*100:.1f}% | TSFC: Structurally enforced (Δthrust-driven)")
+                print(f"Cycle {row['Cycle']} | Health: {overall_h*100:.1f}% | TSFC: Structurally enforced (Delta-thrust-driven)")
         except requests.exceptions.RequestException as e:
             print(f"Network Warning: Could not push telemetry to Dashboard. ({type(e).__name__})")
             time.sleep(2)
