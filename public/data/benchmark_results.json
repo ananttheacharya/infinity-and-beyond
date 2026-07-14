@@ -1,31 +1,26 @@
 {
-  "variants": [
+  "models": [
     {
       "name": "Baseline-Raw",
-      "rmse": 0.02671279013156891,
-      "tsfc_rmse": 0.0014282189076766372
+      "health_rmse": 0.02159843910485506,
+      "tsfc_violation": 0.0013500127824954689
     },
     {
-      "name": "Baseline-PhysFeat",
-      "rmse": 0.03108062967658043,
-      "tsfc_rmse": 0.0040383837185800076
+      "name": "PhysFeat-Combined",
+      "health_rmse": 0.021878774650394915,
+      "tsfc_violation": 0.0017541480483487248
     },
     {
       "name": "Full Model",
-      "rmse": 0.03278031200170517,
-      "tsfc_rmse": 0.0033904914744198322
+      "health_rmse": 0.021197265293449164,
+      "tsfc_violation": 0.001417235325789079
     }
   ],
   "surrogate": {
-    "slow_path_s": 0.2114119999896502,
-    "fast_path_s": 0.0003285999991931021,
-    "surrogate_ms": 0.005476666653218369,
-    "speedup_x": 643.3718822543689,
-    "n_params": 2565
-  },
-  "calibration": {
-    "coverage_1std_pct": 36.666667461395264,
-    "n_held_out": 60,
-    "description": "% of true values falling within predicted mean \u00b1 1 std on held-out test engines"
+    "slow_path_s": 0.7788973999995505,
+    "fast_path_s": 0.00037390000943560153,
+    "surrogate_ms": 0.0012463333647853383,
+    "speedup_x": 2083.170313836816,
+    "n_params": 2917
   }
 }

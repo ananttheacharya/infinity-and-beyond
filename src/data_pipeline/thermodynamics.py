@@ -101,7 +101,82 @@ class ThermodynamicsEngine:
                 df_phys['Estimated_Thermal_Efficiency'] = net_work_total / (q_in_total + 1e-6)
             
         # Drop perfectly collinear and intermediate features to prevent small-sample memorization
-        cols_to_drop = ['Combustion_Temp_Rise', 'Overall_Pressure_Ratio', 'Compressor_Specific_Work', 'Turbine_Specific_Work', 'Combustor_Heat_Addition']
+        cols_to_drop = ['Combustion_Temp_Rise', 'Overall_Pressure_Ratio', 'Compressor_Specific_Work', 'Turbine_Specific_Work', 'Combustor_Heat_Addition', 'Normalized_RPM']
         df_phys = df_phys.drop(columns=cols_to_drop, errors='ignore')
+        
+        # Include atmospheric context which is critical for absolute thrust prediction
+        if 'Altitude_m' in df.columns:
+            df_phys['Altitude_m'] = df['Altitude_m']
+        if 'Mach' in df.columns:
+            df_phys['Mach'] = df['Mach']
+            
+        return df_phys
+
+    def extract_real_gas_features(self, df):
+        """
+        Transforms raw sensor DataFrame into physically meaningful features,
+        but using temperature-dependent cp(T) and gamma(T) instead of constants.
+        """
+        df_phys = pd.DataFrame()
+        
+        # Approximate cp(T) J/kgK
+        # Simple linear fit for air: cp(300K) = 1005, cp(3000K) = 1200
+        def cp_func(t): return 1005.0 + 0.0722 * (t - 300.0)
+        def gamma_func(t): return cp_func(t) / (cp_func(t) - self.R)
+        
+        # Compressor
+        if all(col in df.columns for col in ['P2', 'Pamb']):
+            df_phys['PR_comp'] = self.compute_compressor_pressure_ratio(df['P2'], df['Pamb'])
+            
+        if all(col in df.columns for col in ['Tamb', 'T2', 'Pamb', 'P2']):
+            t_avg_c = (df['Tamb'] + df['T2']) / 2.0
+            gamma_c = gamma_func(t_avg_c)
+            pr = self.compute_compressor_pressure_ratio(df['P2'], df['Pamb'])
+            tr = self.compute_temperature_ratio(df['T2'], df['Tamb'])
+            ideal_work = np.power(pr, (gamma_c - 1) / gamma_c) - 1
+            actual_work = tr - 1
+            df_phys['Comp_Isentropic_Efficiency'] = ideal_work / (actual_work + 1e-6)
+            
+            cp_c = cp_func(t_avg_c)
+            df_phys['Compressor_Specific_Work'] = cp_c * (df['T2'] - df['Tamb'])
+            
+        # Turbine
+        if all(col in df.columns for col in ['P4', 'P3']):
+            df_phys['PR_turb'] = self.compute_turbine_pressure_ratio(df['P4'], df['P3'])
+            
+        if all(col in df.columns for col in ['T4', 'T3', 'P4', 'P3']):
+            t_avg_t = (df['T3'] + df['T4']) / 2.0
+            gamma_t = gamma_func(t_avg_t)
+            t_ratio = df['T4'] / df['T3']
+            p_ratio = df['P4'] / df['P3']
+            ideal_work_t = 1 - np.power(p_ratio, (gamma_t - 1) / gamma_t)
+            actual_work_t = 1 - t_ratio
+            df_phys['Turb_Isentropic_Efficiency'] = actual_work_t / (ideal_work_t + 1e-6)
+            
+            cp_t = cp_func(t_avg_t)
+            df_phys['Turbine_Specific_Work'] = cp_t * (df['T3'] - df['T4'])
+            
+        if 'Turbine_Specific_Work' in df_phys.columns and 'Compressor_Specific_Work' in df_phys.columns:
+            df_phys['Net_Specific_Work'] = df_phys['Turbine_Specific_Work'] - df_phys['Compressor_Specific_Work']
+            
+        # Combustor & LHV
+        if all(col in df.columns for col in ['Fuel_Flow', 'T2', 'T3']):
+            t_avg_comb = (df['T2'] + df['T3']) / 2.0
+            cp_comb = cp_func(t_avg_comb)
+            q_in_total = df['Fuel_Flow'] * self.LHV
+            delta_t_comb = df['T3'] - df['T2']
+            df_phys['Estimated_Air_Mass_Flow'] = q_in_total / (cp_comb * delta_t_comb + 1e-6)
+            
+            if 'Net_Specific_Work' in df_phys.columns:
+                net_work_total = df_phys['Estimated_Air_Mass_Flow'] * df_phys['Net_Specific_Work']
+                df_phys['Estimated_Thermal_Efficiency'] = net_work_total / (q_in_total + 1e-6)
+                
+        cols_to_drop = ['Compressor_Specific_Work', 'Turbine_Specific_Work']
+        df_phys = df_phys.drop(columns=cols_to_drop, errors='ignore')
+        
+        if 'Altitude_m' in df.columns:
+            df_phys['Altitude_m'] = df['Altitude_m']
+        if 'Mach' in df.columns:
+            df_phys['Mach'] = df['Mach']
             
         return df_phys

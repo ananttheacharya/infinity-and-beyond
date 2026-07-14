@@ -12,19 +12,25 @@ from src.models.pinn import DigitalTwinModel
 from src.models.loss import PhysicsConstrainedLoss
 import joblib
 
-def train_model(model_name, use_physics, alpha, beta_health, df_train, df_val, train_idx, val_idx, device):
+def train_model(model_name, features, alpha, beta_health, seq_len, model_type, df_train, df_val, train_idx, val_idx, device):
     print(f"\n=== Training Variant: {model_name} ===")
+    
+    use_physics = (features != "raw")
     
     train_loader, val_loader, scaler, target_scaler, feature_cols = prepare_dataloaders(
         pd.concat([df_train, df_val], ignore_index=True), 
         list(range(len(df_train))), 
         list(range(len(df_train), len(df_train) + len(df_val))), 
         batch_size=64, 
-        use_physics_features=use_physics
+        use_physics_features=use_physics,
+        seq_length=seq_len
     )
     
     input_dim = len(feature_cols)
-    model = DigitalTwinModel(input_dim=input_dim, hidden_dim=32, dropout_rate=0.1).to(device)
+    if model_type == 'mlp':
+        input_dim = input_dim * seq_len
+        
+    model = DigitalTwinModel(input_dim=input_dim, hidden_dim=32, dropout_rate=0.1, model_type=model_type).to(device)
     criterion = PhysicsConstrainedLoss(alpha=alpha, beta_health=beta_health)
     optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
 
@@ -110,14 +116,14 @@ def main():
     print(f"Train size: {len(df_train)}, Val size: {len(df_val)}, Test size: {len(df_test)}")
     
     variants = [
-        {"name": "Baseline-Raw", "use_physics": False, "alpha": 1.0, "beta_health": 0.0},
-        {"name": "Baseline-PhysFeat", "use_physics": True, "alpha": 1.0, "beta_health": 0.0},
-        {"name": "Full Model", "use_physics": True, "alpha": 1.0, "beta_health": 1.0}
+        {"name": "Baseline-Raw", "features": "raw", "alpha": 1.0, "beta_health": 0.0, "seq_len": 1, "model_type": "mlp"},
+        {"name": "PhysFeat-Combined", "features": "combined", "alpha": 1.0, "beta_health": 0.0, "seq_len": 1, "model_type": "mlp"},
+        {"name": "Full Model", "features": "combined", "alpha": 1.0, "beta_health": 1.0, "seq_len": 5, "model_type": "gru"}
     ]
     
     for v in variants:
         train_model(
-            v["name"], v["use_physics"], v["alpha"], v["beta_health"], 
+            v["name"], v["features"], v["alpha"], v["beta_health"], v["seq_len"], v["model_type"],
             df_train, df_val, list(range(len(df_train))), list(range(len(df_train), len(df_train) + len(df_val))),
             device
         )

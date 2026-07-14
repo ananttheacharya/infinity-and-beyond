@@ -14,14 +14,19 @@ class DigitalTwinModel(nn.Module):
         5. Engine Thrust (N)
     (TSFC is computed deterministically outside the network)
     """
-    def __init__(self, input_dim, hidden_dim=32, dropout_rate=0.1):
+    def __init__(self, input_dim, hidden_dim=32, dropout_rate=0.1, model_type='mlp'):
         super(DigitalTwinModel, self).__init__()
+        self.model_type = model_type
         
-        # Shared Feature Extractor (Backbone)
-        self.shared_fc1 = nn.Linear(input_dim, hidden_dim)
-        self.shared_fc2 = nn.Linear(hidden_dim, hidden_dim)
-        self.shared_fc3 = nn.Linear(hidden_dim, hidden_dim)
-        
+        if self.model_type == 'mlp':
+            # Shared Feature Extractor (Backbone)
+            self.shared_fc1 = nn.Linear(input_dim, hidden_dim)
+            self.shared_fc2 = nn.Linear(hidden_dim, hidden_dim)
+            self.shared_fc3 = nn.Linear(hidden_dim, hidden_dim)
+        elif self.model_type == 'gru':
+            self.gru = nn.GRU(input_dim, hidden_dim, num_layers=1, batch_first=True)
+            self.post_gru_fc = nn.Linear(hidden_dim, hidden_dim)
+            
         # MC Dropout Layer - we keep this active even during inference for uncertainty estimation
         self.mc_dropout = nn.Dropout(p=dropout_rate)
         
@@ -33,13 +38,26 @@ class DigitalTwinModel(nn.Module):
         self.thrust_head = nn.Linear(hidden_dim, 1)
 
     def forward(self, x):
-        # Shared layers
-        x = F.relu(self.shared_fc1(x))
-        x = self.mc_dropout(x)
-        x = F.relu(self.shared_fc2(x))
-        x = self.mc_dropout(x)
-        x = F.relu(self.shared_fc3(x))
-        x = self.mc_dropout(x)
+        if self.model_type == 'mlp':
+            # If input is 3D (batch, seq, features), flatten it for hand-engineered features
+            # or just take the last step if it wasn't flattened
+            if x.dim() == 3:
+                x = x.reshape(x.shape[0], -1) # Flatten (seq_len * features)
+                
+            x = F.relu(self.shared_fc1(x))
+            x = self.mc_dropout(x)
+            x = F.relu(self.shared_fc2(x))
+            x = self.mc_dropout(x)
+            x = F.relu(self.shared_fc3(x))
+            x = self.mc_dropout(x)
+        elif self.model_type == 'gru':
+            # x shape: (batch, seq, features)
+            gru_out, h_n = self.gru(x)
+            # h_n shape: (num_layers, batch, hidden_dim)
+            x = h_n[-1] # take the last layer's hidden state -> (batch, hidden_dim)
+            x = self.mc_dropout(x)
+            x = F.relu(self.post_gru_fc(x))
+            x = self.mc_dropout(x)
         
         # Subsystem & Overall Health (Z-score normalized)
         comp_h = self.compressor_head(x)
