@@ -1,0 +1,21 @@
+# Agent Changelog & Context Log
+
+This file tracks the evolving experimental design, structural changes, and execution steps applied to the project.
+
+## [2026-07-14] - Phase 1 Strategic Planning: N-CMAPSS Transfer Learning
+- **Reframing**: Pivoted the transfer learning approach from an assumed benefit into a formalized research hypothesis ("Cross-Architecture Representation Transfer").
+- **Documentation Update**: Appended the complete, rigorous Phase 1 research methodology to `docs/system_architecture.md`.
+- **Methodology Adjustments**:
+  - Replaced Masked Sensor Modeling with Contrastive Learning (TS2Vec-style objective) to avoid shortcut learning.
+  - Specified Multi-Regime Data Extraction (Takeoff, Climb, Cruise, Descent) rather than steady-cruise alone.
+  - Formally defined the positive pairs for contrastive learning (overlapping/nearby windows from the same flight).
+  - Explicitly defined the 32-dim Latent Space as the "Engine State Representation Space".
+  - Defined rigid Success Levels (Level 0 through 3).
+  - Defined a strict "Abort Criterion" based on Linear Probing.
+  - Detailed rigorous evaluation metrics beyond RMSE (MAE, R², inference time, representation drift, clustering metrics like silhouette score).
+  - Laid out a modular ablation framework (sequence lengths: 32 vs 64 vs 128, adapter sizes, and control experiments including shuffled temporal data).
+
+## [2026-07-14] - Phase 1 Abort & Transition to Phase 2
+- **Phase 1 Result**: Linear probe ablation (LOEO-CV) showed the frozen pretrained encoder (0.0235 RMSE) performed no better than a frozen random encoder (0.0224 RMSE) with p=0.8457.
+- **Decision**: Triggered the strict abort criterion. Transfer learning from N-CMAPSS turbofan data did not yield transferable turbojet representations.
+- **Next Step**: Moving entirely to Phase 2 (TurboJetSim) to build a native physics-consistent synthetic data generator.

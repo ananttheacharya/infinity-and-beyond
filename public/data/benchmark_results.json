@@ -2,30 +2,30 @@
   "models": [
     {
       "name": "MLP (N=3)",
-      "health_rmse": 0.037046870589256285,
-      "tsfc_violation": 0.0023070449708029626
+      "health_rmse": 0.03591281231492758,
+      "tsfc_violation": 0.0025195145281031728
     },
     {
       "name": "GRU (N=3)",
-      "health_rmse": 0.02851068079471588,
-      "tsfc_violation": 0.0019446377991698682
+      "health_rmse": 0.03040963225066662,
+      "tsfc_violation": 0.0018613638589158655
     },
     {
       "name": "MLP (N=5)",
-      "health_rmse": 0.04225049503147602,
-      "tsfc_violation": 0.0031418138649314644
+      "health_rmse": 0.04321223888546229,
+      "tsfc_violation": 0.003271095105446875
     },
     {
       "name": "GRU (N=5)",
-      "health_rmse": 0.03190964125096798,
-      "tsfc_violation": 0.0020716436090879144
+      "health_rmse": 0.032043878175318244,
+      "tsfc_violation": 0.002301669935695827
     }
   ],
   "surrogate": {
-    "slow_path_s": 0.8116494000132661,
-    "fast_path_s": 0.0008231000101659447,
-    "surrogate_ms": 0.002743666700553149,
-    "speedup_x": 986.088433955468,
+    "slow_path_s": 1.2175161000050139,
+    "fast_path_s": 0.0009966000070562586,
+    "surrogate_ms": 0.003322000023520862,
+    "speedup_x": 1221.6697685978286,
     "n_params": 6309
   }
 }

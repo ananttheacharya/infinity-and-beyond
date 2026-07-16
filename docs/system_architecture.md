@@ -443,3 +443,60 @@ INPUT: Raw Sensor Stream {Tamb, Pamb, T2, P2, T3, P3, T4, P4, RPM, Fuel_Flow, Al
 **Parameter count**: ~3,200 trainable parameters (GRU: 3×32×(19+32+1)×4 = ~5,888; plus output heads 5×33 = 165; plus post-GRU dense = 32×32+32 = 1,056). A deliberately minimal footprint for edge deployment.
 
 **Training**: Adam optimizer, lr=0.001, weight_decay=1e-4, early stopping with patience=20 on validation MSE, max 300 epochs.
+
+## 6. Next Steps: Cross-Architecture Representation Transfer (Phase 1)
+
+While the baseline Physics-Constrained Digital Twin achieves strong performance, it is constrained by a small supervised dataset (300 rows). To address this, Phase 1 introduces a rigorous methodology to transfer thermodynamic representations from the massive N-CMAPSS turbofan dataset.
+
+### 6.1 Research Hypothesis & Success Criteria
+
+**H1 (Alternative):** The encoder learns representations that are transferable across gas-turbine architectures because fundamental thermodynamic relationships are shared.
+**H0 (Null):** Representations are architecture-specific and do not transfer.
+
+**Success Levels:**
+- **Level 0 (Failure):** No RMSE improvement, no convergence improvement, no latent alignment -> Conclude transfer failed.
+- **Level 1:** RMSE unchanged, BUT training converges much faster -> Positive result.
+- **Level 2:** RMSE improves AND convergence improves -> Excellent.
+- **Level 3:** RMSE, uncertainty calibration, and generalization all improve -> Outstanding.
+
+**Abort Criterion:** If a Linear Probe (frozen pretrained encoder + trained linear head) performs no better than random initialization after N epochs, further transfer-learning experiments will be discontinued to prevent sunk-cost fallacy.
+
+### 6.2 The Transfer Architecture
+
+To prevent the network from learning false physics (e.g., equating a turbofan fan speed to a turbojet core speed), we introduce domain-specific adapters projecting into an **Engine State Representation Space**.
+
+1. **Multi-Regime Sampling:** Extract 128-timestep sequences across Takeoff, Climb, Cruise, and Descent from N-CMAPSS to capture all transient degradation signatures.
+2. **N-CMAPSS Adapter:** Linear(14, 64) -> ReLU -> LayerNorm -> Linear(64, 32)
+3. **Turbojet Adapter:** Linear(19, 64) -> ReLU -> LayerNorm -> Linear(64, 32)
+4. **Shared Backbone:** A shared GRU operating exclusively on the 32-dimensional Engine State Representation Space.
+
+### 6.3 Contrastive Learning Objective
+
+To prevent 'shortcut learning' common in masked reconstruction (e.g., predicting constant fuel flow during cruise), we utilize Contrastive Time-Series Representation Learning.
+- **Positive Pairs:** Overlapping windows, nearby windows from the same flight, temporal neighbors.
+- **Negative Pairs:** Different engines, distant flights, different operating regimes.
+
+### 6.4 Experimental Ablations & Diagnostics
+
+The evaluation will isolate variables to prove *why* performance improves:
+
+- **Baseline Hierarchy:**
+  - *Baseline A:* Random initialization -> Fine-tune.
+  - *Baseline B:* N-CMAPSS transfer -> Fine-tune.
+- **Control Experiments:** 
+  - Pretrain on randomly shuffled N-CMAPSS (destroying temporal order). If performance matches Baseline B, temporal representations were not driving the transfer.
+  - Freeze adapter vs. freeze encoder to locate where transfer happens.
+- **Ablations:** Sequence lengths (32, 64, 128) and Adapter depths (64->32 vs. 32->16).
+- **Representation Diagnostics:** Latent spaces will be evaluated quantitatively using Cosine Similarity, Silhouette Score, and Cluster Purity, alongside qualitative visualization via UMAP and PCA.
+- **Representation Drift:** Track the distance between the pretrained latent space and the fine-tuned latent space to quantify forgetting during layer-wise fine-tuning.
+
+### 6.5 Research Risks & Mitigations
+
+| Risk | Mitigation |
+|:---|:---|
+| No transfer | Early Abort via Linear Probe, pivot to TurboJetSim |
+| Negative transfer | Adapter tuning, learning rate adjustments |
+| Domain mismatch | Layer-wise fine-tuning |
+| Small downstream dataset | Physics-constrained loss + LOEO-CV |
+| Overfitting | Early stopping + MC Dropout |
+
